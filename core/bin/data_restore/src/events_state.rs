@@ -1,6 +1,7 @@
 // Built-in deps
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::fmt::Debug;
 // External deps
 use anyhow::format_err;
 use web3::contract::Contract;
@@ -10,6 +11,7 @@ use web3::types::{
 use web3::{Transport, Web3};
 // Workspace deps
 use zksync_contracts::upgrade_gatekeeper;
+use zksync_types::withdrawals::{WithdrawalEvent, WithdrawalPendingEvent};
 use zksync_types::{Address, BlockNumber, NewTokenEvent, PriorityOp, SerialId};
 // Local deps
 use crate::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
@@ -30,6 +32,15 @@ pub struct EventsState {
     /// fetching fields which are not present in public data
     /// such as Ethereum transaction hash.
     pub priority_op_data: HashMap<SerialId, PriorityOp>,
+}
+
+pub struct NewEvents<'a, T: Transport + Debug> {
+    pub block_logs: Vec<(&'a ZkSyncDeployedContract<T>, Vec<Log>)>,
+    pub new_tokens: Vec<NewTokenEvent>,
+    pub priority_ops: Vec<PriorityOp>,
+    pub withdrawal_events: Vec<WithdrawalEvent>,
+    pub withdrawal_pending_events: Vec<WithdrawalPendingEvent>,
+    pub last_block: u64,
 }
 
 impl std::default::Default for EventsState {
@@ -99,27 +110,43 @@ impl EventsState {
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
         init_contract_version: u32,
-    ) -> Result<(Vec<BlockEvent>, Vec<NewTokenEvent>, Vec<PriorityOp>, u64), anyhow::Error> {
+    ) -> Result<
+        (
+            Vec<BlockEvent>,
+            Vec<NewTokenEvent>,
+            Vec<PriorityOp>,
+            Vec<WithdrawalPendingEvent>,
+            Vec<WithdrawalEvent>,
+            u64,
+        ),
+        anyhow::Error,
+    > {
         self.remove_verified_events();
 
-        let (events, token_events, priority_op_data, to_block_number) =
-            EventsState::get_new_events_and_last_watched_block(
-                web3,
-                zksync_contract,
-                governance_contract,
-                self.last_watched_eth_block_number,
-                eth_blocks_step,
-                end_eth_blocks_offset,
-            )
-            .await?;
+        let NewEvents {
+            block_logs,
+            new_tokens,
+            priority_ops,
+            withdrawal_events,
+            withdrawal_pending_events,
+            last_block,
+        } = EventsState::get_new_events_and_last_watched_block(
+            web3,
+            zksync_contract,
+            governance_contract,
+            self.last_watched_eth_block_number,
+            eth_blocks_step,
+            end_eth_blocks_offset,
+        )
+        .await?;
         // Parse the initial contract version.
         let init_contract_version = ZkSyncContractVersion::try_from(init_contract_version)
             .expect("invalid initial contract version provided");
         // Pass Ethereum block numbers that correspond to `UpgradeComplete`
         // events emitted by the Upgrade GateKeeper. Should be provided by the
         // config.
-        self.last_watched_eth_block_number = to_block_number;
-        for (zksync_contract, block_events) in events {
+        self.last_watched_eth_block_number = last_block;
+        for (zksync_contract, block_events) in block_logs {
             self.update_blocks_state(
                 zksync_contract,
                 &block_events,
@@ -132,7 +159,7 @@ impl EventsState {
         events_to_return.extend(self.verified_events.clone());
 
         // Extend the queue with new operations and return it.
-        for priority_op in priority_op_data {
+        for priority_op in priority_ops {
             self.priority_op_data
                 .insert(priority_op.serial_id, priority_op);
         }
@@ -140,8 +167,10 @@ impl EventsState {
 
         Ok((
             events_to_return,
-            token_events,
+            new_tokens,
             priority_op_data,
+            withdrawal_pending_events,
+            withdrawal_events,
             self.last_watched_eth_block_number,
         ))
     }
@@ -175,17 +204,19 @@ impl EventsState {
         last_watched_block_number: u64,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
-    ) -> anyhow::Result<(
-        Vec<(&'a ZkSyncDeployedContract<T>, Vec<Log>)>,
-        Vec<NewTokenEvent>,
-        Vec<PriorityOp>,
-        u64,
-    )> {
+    ) -> anyhow::Result<NewEvents<'a, T>> {
         let latest_eth_block_minus_delta =
             EventsState::get_last_block_number(web3).await? - end_eth_blocks_offset;
 
         if latest_eth_block_minus_delta == last_watched_block_number {
-            return Ok((vec![], vec![], vec![], last_watched_block_number));
+            return Ok(NewEvents {
+                block_logs: vec![],
+                new_tokens: vec![],
+                priority_ops: vec![],
+                withdrawal_events: vec![],
+                withdrawal_pending_events: vec![],
+                last_block: last_watched_block_number,
+            });
             // No new eth blocks
         }
 
@@ -199,7 +230,7 @@ impl EventsState {
             from_block_number_u64 + eth_blocks_step
         };
 
-        let token_logs = EventsState::get_token_added_logs(
+        let new_tokens = EventsState::get_token_added_logs(
             web3,
             governance_contract,
             Web3BlockNumber::Number(from_block_number_u64.into()),
@@ -224,7 +255,22 @@ impl EventsState {
         )
         .await?;
 
-        Ok((logs, token_logs, priority_op_data, to_block_number_u64))
+        let (withdrawal_events, withdrawal_pending_events) = EventsState::get_withdrawal_logs(
+            web3,
+            zksync_contract,
+            from_block_number_u64.into(),
+            to_block_number_u64.into(),
+        )
+        .await?;
+
+        Ok(NewEvents {
+            block_logs: logs,
+            new_tokens,
+            priority_ops: priority_op_data,
+            withdrawal_events,
+            withdrawal_pending_events,
+            last_block: to_block_number_u64,
+        })
     }
 
     /// Returns logs about complete contract upgrades.
@@ -351,6 +397,65 @@ impl EventsState {
                 }
             }
         }
+    }
+
+    /// Returns new withdrawal logs
+    ///
+    /// # Arguments
+    ///
+    /// * `web3` - Web3 provider url
+    /// * `contract` - Governance contract
+    /// * `from` - From ethereum block number
+    /// * `to` - To ethereum block number
+    ///
+    async fn get_withdrawal_logs<T: Transport>(
+        web3: &Web3<T>,
+        contract: &ZkSyncDeployedContract<T>,
+        from: Web3BlockNumber,
+        to: Web3BlockNumber,
+    ) -> Result<(Vec<WithdrawalEvent>, Vec<WithdrawalPendingEvent>), anyhow::Error> {
+        let withdrawal_event_topic = contract
+            .abi
+            .event("Withdrawal")
+            .expect("ZkSync contract abi error")
+            .signature();
+
+        let pending_withdrawal_event_topic = contract
+            .abi
+            .event("WithdrawalPending")
+            .expect("ZkSync contract abi error")
+            .signature();
+
+        let filter = FilterBuilder::default()
+            .address(vec![contract.web3_contract.address()])
+            .from_block(from)
+            .to_block(to)
+            .topics(
+                Some(vec![withdrawal_event_topic, pending_withdrawal_event_topic]),
+                None,
+                None,
+                None,
+            )
+            .build();
+
+        let logs = web3.eth().logs(filter).await?;
+        let mut pending_withdrawals = vec![];
+        let mut withdrawals = vec![];
+        for log in logs {
+            if log.topics[0] == pending_withdrawal_event_topic {
+                pending_withdrawals.push(WithdrawalPendingEvent::try_from(log).map_err(|e| {
+                    format_err!(
+                        "Failed to parse WithdrawalPendingEvent event log from ETH: {}",
+                        e
+                    )
+                })?)
+            } else {
+                withdrawals.push(WithdrawalEvent::try_from(log).map_err(|e| {
+                    format_err!("Failed to parse Withdrawal event log from ETH: {}", e)
+                })?)
+            }
+        }
+        Ok((withdrawals, pending_withdrawals))
     }
 
     /// Returns new added token logs
@@ -629,8 +734,8 @@ mod test {
         let last_block_ver = u32_to_32bytes(15);
         let last_block_com = u32_to_32bytes(10);
         let mut data = vec![];
-        data.extend(&last_block_com);
-        data.extend(&last_block_ver);
+        data.extend(last_block_com);
+        data.extend(last_block_ver);
         let log = create_log(
             contract_addr,
             reverted_topic,

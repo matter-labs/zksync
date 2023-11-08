@@ -4,7 +4,10 @@ FROM debian:buster-slim
 WORKDIR /usr/src/zksync
 
 # Prepare dependencies
-RUN apt-get update && apt-get install -y bash git nodejs npm postgresql openssl libssl-dev gcc g++ curl libpq-dev pkg-config software-properties-common axel
+RUN apt-get update
+RUN apt-get install -y bash git npm postgresql openssl libssl-dev gcc g++ curl libpq-dev pkg-config software-properties-common axel
+RUN curl -sL https://deb.nodesource.com/setup_14.x | bash -
+RUN apt-get install -y nodejs
 RUN apt-get install -y libpq5 ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN npm install -g yarn
 

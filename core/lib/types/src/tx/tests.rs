@@ -215,6 +215,7 @@ fn test_print_change_pub_key_for_protocol() {
         Default::default(),
         None,
         &key,
+        None,
     )
     .expect("failed to sign transfer");
 
@@ -443,10 +444,10 @@ fn test_musig_rescue_signing_verification() {
             assert!(
                 sign_pub_key.0.eq(&pub_key.0),
                 "Signature pub key is wrong, msg: {}",
-                hex::encode(&msg)
+                hex::encode(msg)
             );
         } else {
-            panic!("Signature is incorrect, msg: {}", hex::encode(&msg));
+            panic!("Signature is incorrect, msg: {}", hex::encode(msg));
         }
     }
 }
@@ -477,7 +478,7 @@ fn test_ethereum_signature_verify_with_serialization() {
 
     let recovered_address = deserialized_signature
         .signature
-        .signature_recover_signer(message.as_bytes())
+        .signature_recover_signer_from_raw_message(message.as_bytes())
         .expect("signature verification");
 
     assert_eq!(address, recovered_address, "recovered address mismatch");
@@ -506,7 +507,7 @@ fn test_ethereum_signature_verify_examples() {
             PackedEthSignature::deserialize_packed(&hex::decode(&signature[2..]).unwrap())
                 .expect("signature deserialize");
         let signer_address = signature
-            .signature_recover_signer(&msg)
+            .signature_recover_signer_from_raw_message(&msg)
             .expect("signature verification");
         assert_eq!(address, signer_address, "signer address mismatch");
     }

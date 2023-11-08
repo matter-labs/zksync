@@ -70,7 +70,7 @@ impl Witness for MintNFTWitness<Bn256> {
     fn apply_tx(tree: &mut CircuitAccountTree, mint_nft: &MintNFTOp) -> Self {
         let mint_nft_data = MintNFTData {
             fee: mint_nft.tx.fee.to_u128().unwrap(),
-            fee_token: *mint_nft.tx.fee_token as u32,
+            fee_token: *mint_nft.tx.fee_token,
             creator_account_id: *mint_nft.creator_account_id,
             recipient_account_id: *mint_nft.recipient_account_id,
             content_hash: mint_nft.tx.content_hash,
@@ -420,7 +420,7 @@ impl MintNFTWitness<Bn256> {
                 byte_as_bits
             })
             .flatten()
-            .map(|bit| Some(fr_from(&bit)))
+            .map(|bit| Some(fr_from(bit)))
             .collect();
 
         MintNFTWitness {
@@ -477,7 +477,7 @@ impl MintNFTWitness<Bn256> {
                 },
             },
             special_account_before_third_chunk: OperationBranch {
-                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
+                address: Some(fr_from(NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(Fr::from_str(&NFT_TOKEN_ID.0.to_string()).unwrap()),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness_before_third_chunk,
@@ -487,7 +487,7 @@ impl MintNFTWitness<Bn256> {
                 },
             },
             special_account_before_fourth_chunk: OperationBranch {
-                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
+                address: Some(fr_from(NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(new_token_id),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness_before_fourth_chunk,

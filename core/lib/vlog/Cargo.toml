@@ -15,5 +15,5 @@ publish = false # This is an utility crate, not to be used by libraries.
 tracing = { version = "0.1.22", features = ["log"] }
 tracing-subscriber = { version = "0.2.15", features = ["fmt", "chrono"] }
 tracing-appender = "0.1"
-sentry = "0.23.0"
-
+sentry = "0.30.0"
+chrono = "0.4"

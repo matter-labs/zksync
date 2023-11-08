@@ -1,3 +1,4 @@
+#![allow(clippy::diverging_sub_expression)]
 use std::collections::HashMap;
 use zksync::{tokens_cache::TokensCache, utils::*, web3::types::H160};
 use zksync_config::test_config::unit_vectors::{Config as TestVectorsConfig, TestEntry};
@@ -427,10 +428,12 @@ mod signatures_with_vectors {
                     0,
                     TokenKind::ERC20,
                 );
+
+                #[allow(deprecated)]
+                // For backward compatibility with old signatures
                 let change_pub_key = signer
-                    .sign_change_pubkey_tx(
+                    .__old_sign_change_pubkey_tx_ecdsa(
                         sign_data.nonce,
-                        false,
                         token,
                         change_pubkey_tx.fee.clone(),
                         change_pubkey_tx.time_range,

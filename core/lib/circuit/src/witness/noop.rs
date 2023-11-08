@@ -30,7 +30,7 @@ pub fn noop_operation(tree: &CircuitAccountTree, acc_id: u32) -> Operation<Bn256
         None => Fr::zero(),
         Some(bal) => bal.value,
     };
-    let pubdata = vec![false; CHUNK_BIT_WIDTH];
+    let pubdata = [false; CHUNK_BIT_WIDTH];
     let pubdata_chunks: Vec<_> = pubdata
         .chunks(CHUNK_BIT_WIDTH)
         .map(|x| le_bit_vector_into_field_element(&x.to_vec()))

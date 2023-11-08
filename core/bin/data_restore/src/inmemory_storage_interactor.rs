@@ -6,6 +6,7 @@ use std::sync::Arc;
 use web3::types::Address;
 
 use zksync_types::block::Block;
+use zksync_types::withdrawals::{WithdrawalEvent, WithdrawalPendingEvent};
 use zksync_types::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, Action, BlockNumber,
     NewTokenEvent, Operation, PriorityOp, SerialId, Token, TokenId, TokenInfo, TokenKind,
@@ -84,6 +85,14 @@ impl InMemoryStorageInteractor {
             .into_iter()
             .filter(|event| event.block_type == EventType::Verified)
             .collect()
+    }
+
+    pub async fn save_withdrawals(
+        &mut self,
+        _withdrawals: &[WithdrawalEvent],
+        _pending_withdrawals: &[WithdrawalPendingEvent],
+    ) {
+        // We don't use it for testing right now
     }
 
     pub(crate) fn load_committed_events_state(&self) -> Vec<BlockEvent> {
@@ -195,7 +204,7 @@ impl InMemoryStorageInteractor {
 
         let verify_op = Operation {
             action: Action::Verify {
-                proof: Box::new(Default::default()),
+                proof: Box::default(),
             },
             block: block.clone(),
             id: None,

@@ -1,3 +1,4 @@
+#![allow(clippy::diverging_sub_expression)]
 // Built-in
 use std::clone::Clone;
 use std::str::FromStr;
@@ -45,7 +46,6 @@ impl MockDatabase {
             blocks: Arc::new(RwLock::new(Vec::new())),
             account_tree_cache: Arc::new(RwLock::new(AccountTreeCache {
                 block: 0,
-                tree_cache: None,
                 tree_cache_binary,
             })),
             accounts_state: Arc::new(RwLock::new((0, accounts))),
@@ -96,7 +96,7 @@ impl DatabaseInterface for MockDatabase {
     ) -> anyhow::Result<()> {
         let mut prover_job_queue = self.prover_job_queue.write().await;
         let id = prover_job_queue.0;
-        (*prover_job_queue).0 += 1;
+        prover_job_queue.0 += 1;
 
         let new_job = StorageProverJobQueue {
             job_status: ProverJobStatus::Idle.to_number(),
@@ -352,7 +352,6 @@ impl DatabaseInterface for MockDatabase {
         let mut account_tree_cache = self.account_tree_cache.write().await;
         *account_tree_cache = AccountTreeCache {
             block: i64::from(*block),
-            tree_cache: None,
             tree_cache_binary: Some(tree_cache_binary),
         };
 

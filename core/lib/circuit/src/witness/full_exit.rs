@@ -63,7 +63,7 @@ impl Witness for FullExitWitness<Bn256> {
         (full_exit, is_success): &(FullExitOp, bool),
     ) -> Self {
         let full_exit = FullExitData {
-            token: *full_exit.priority_op.token as u32,
+            token: *full_exit.priority_op.token,
             account_address: *full_exit.priority_op.account_id,
             eth_address: eth_address_to_fr(&full_exit.priority_op.eth_address),
             full_exit_amount: full_exit
@@ -314,7 +314,7 @@ impl FullExitWitness<Bn256> {
                 byte_as_bits
             })
             .flatten()
-            .map(|bit| Some(fr_from(&bit)))
+            .map(|bit| Some(fr_from(bit)))
             .collect();
 
         FullExitWitness {
@@ -339,7 +339,7 @@ impl FullExitWitness<Bn256> {
                 },
             },
             special_account_second_chunk: OperationBranch {
-                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
+                address: Some(fr_from(NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(token_fe),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness,
@@ -378,7 +378,7 @@ impl FullExitWitness<Bn256> {
             },
             before_root: Some(before_root),
             after_root: Some(after_root),
-            tx_type: Some(fr_from(&FullExitOp::OP_CODE)),
+            tx_type: Some(fr_from(FullExitOp::OP_CODE)),
         }
     }
 }

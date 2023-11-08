@@ -109,7 +109,7 @@ async fn get_oldest_unfulfilled_request(mut storage: StorageProcessor<'_>) -> Qu
         .get_oldest_unfulfilled_request()
         .await?;
     // The first request has been fulfilled. Thus, the second one should be the oldest
-    assert!(matches!(oldest_unfulfilled_request, None));
+    assert!(oldest_unfulfilled_request.is_none());
 
     Ok(())
 }
@@ -183,7 +183,7 @@ async fn delete_old_requests(mut storage: StorageProcessor<'_>) -> QueryResult<(
     // false means should have been deleted
     // Note that we have set the fulfilled_by for the first tx, that's why it should
     // not have been deleted
-    let should_remain = vec![true, false, true, true];
+    let should_remain = [true, false, true, true];
 
     for (i, request) in stored_requests.into_iter().enumerate() {
         let stored = ForcedExitRequestsSchema(&mut storage)

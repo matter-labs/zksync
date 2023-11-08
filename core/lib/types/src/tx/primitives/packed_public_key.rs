@@ -24,7 +24,7 @@ impl PackedPublicKey {
             return Err(DeserializeError::IncorrectPublicKeyLength);
         }
         Ok(PackedPublicKey(PublicKey::<Engine>(
-            edwards::Point::read(&*bytes, &JUBJUB_PARAMS as &AltJubjubBn256)
+            edwards::Point::read(bytes, &JUBJUB_PARAMS as &AltJubjubBn256)
                 .map_err(DeserializeError::RestoreCurvePoint)?,
         )))
     }
@@ -55,7 +55,7 @@ impl<'de> Deserialize<'de> for PackedPublicKey {
     {
         use serde::de::Error;
         let string = String::deserialize(deserializer)?;
-        let bytes = hex::decode(&string).map_err(Error::custom)?;
+        let bytes = hex::decode(string).map_err(Error::custom)?;
         Self::deserialize_packed(&bytes).map_err(Error::custom)
     }
 }

@@ -95,20 +95,26 @@ impl MempoolTransactionsQueue {
     fn prepare_new_ready_l2_transactions(&mut self, block_timestamp: u64) {
         // Move some pending transactions to the ready_txs queue
         let mut ready_pending_l2_operations = {
-            let mut ready_pending_l2_operations = Vec::new();
+            let mut ready_pending_l2_operations = VecDeque::new();
 
             while let Some(pending_tx) = self.pending_l2_transactions.peek() {
                 if pending_tx.valid_from <= block_timestamp {
-                    ready_pending_l2_operations.push(pending_tx.tx.clone());
+                    ready_pending_l2_operations.push_back(pending_tx.tx.clone());
                     self.pending_l2_transactions.pop();
                 } else {
                     break;
                 }
             }
+            ready_pending_l2_operations
+        };
 
-            // Now transactions should be sorted by the nonce (transaction natural order)
-            // According to our convention in batch `fee transaction` would be the last one, so we would use nonce from it as a key for sort
-            ready_pending_l2_operations.sort_by_key(|tx| match tx {
+        // Now transactions should be sorted by the nonce (transaction natural order)
+        // According to our convention in batch `fee transaction` would be the last one, so we would use nonce from it as a key for sort
+        self.ready_l2_transactions
+            .append(&mut ready_pending_l2_operations);
+        self.ready_l2_transactions
+            .make_contiguous()
+            .sort_by_key(|tx| match tx {
                 SignedTxVariant::Tx(tx) => tx.tx.nonce(),
                 SignedTxVariant::Batch(batch) => batch
                     .txs
@@ -117,12 +123,6 @@ impl MempoolTransactionsQueue {
                     .tx
                     .nonce(),
             });
-
-            VecDeque::<SignedTxVariant>::from(ready_pending_l2_operations)
-        };
-
-        self.ready_l2_transactions
-            .append(&mut ready_pending_l2_operations);
     }
 
     /// Collect txs depending on desired chunks and execution time

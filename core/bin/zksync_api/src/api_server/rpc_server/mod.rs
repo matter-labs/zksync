@@ -16,7 +16,7 @@ use zksync_storage::{
     },
     ConnectionPool, StorageProcessor,
 };
-use zksync_types::{tx::TxHash, Address, BlockNumber};
+use zksync_types::{tx::TxHash, Address, BlockNumber, ChainId};
 use zksync_utils::panic_notify::{spawn_panic_handler, ThreadPanicNotify};
 
 // Local uses
@@ -47,6 +47,7 @@ pub struct RpcApp {
 }
 
 impl RpcApp {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         connection_pool: ConnectionPool,
         sign_verify_request_sender: mpsc::Sender<VerifySignatureRequest>,
@@ -54,6 +55,7 @@ impl RpcApp {
         config: &CommonApiConfig,
         token_config: &TokenConfig,
         confirmations_for_eth_event: u64,
+        chain_id: ChainId,
         mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
     ) -> Self {
         let api_requests_caches_size = config.caches_size;
@@ -65,6 +67,7 @@ impl RpcApp {
             config,
             token_config,
             mempool_tx_sender,
+            chain_id,
         );
 
         RpcApp {
@@ -241,7 +244,7 @@ impl RpcApp {
                     );
                     Error::internal_error()
                 })?
-                .map(|tx_hash| format!("0x{}", hex::encode(&tx_hash)));
+                .map(|tx_hash| format!("0x{}", hex::encode(tx_hash)));
 
             if let Some(complete_withdrawals_tx_hash) = complete_withdrawals_tx_hash.clone() {
                 self.cache_of_complete_withdrawal_tx_hashes
@@ -265,6 +268,7 @@ pub fn start_rpc_server(
     common_api_config: &CommonApiConfig,
     token_config: &TokenConfig,
     mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
+    chain_id: ChainId,
     confirmations_for_eth_event: u64,
 ) -> JoinHandle<()> {
     let addr = config.http_bind_addr();
@@ -275,6 +279,7 @@ pub fn start_rpc_server(
         common_api_config,
         token_config,
         confirmations_for_eth_event,
+        chain_id,
         mempool_tx_sender,
     );
 

@@ -15,7 +15,7 @@ impl MatterMostNotifier {
 
     pub async fn send_notify(&self, username: &str, text: &str) -> anyhow::Result<()> {
         let parameters = serde_json::json!({
-            "username": serde_json::to_value(&username)?,
+            "username": serde_json::to_value(username)?,
             "text": serde_json::to_value(text)?,
         });
 

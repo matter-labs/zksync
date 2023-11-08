@@ -698,8 +698,11 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                     INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
                 WHERE aggregate_operations.confirmed = true
             ), tx_hashes AS (
-                SELECT DISTINCT tx_hash FROM tx_filters
+                SELECT DISTINCT sequence_number FROM tx_filters
                 WHERE address = $1
+                ORDER BY sequence_number desc
+                OFFSET $2
+                LIMIT $3
             ), transactions AS (
                 SELECT
                     *
@@ -714,14 +717,14 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         fail_reason,
                         block_number,
                         created_at,
-                        sequence_number,
+                        executed_transactions.sequence_number,
                         batch_id
-                    FROM tx_hashes
-                    INNER JOIN executed_transactions
-                        ON tx_hashes.tx_hash = executed_transactions.tx_hash
-                    union all
-                    select
-                        concat_ws(',', block_number, block_index) as tx_id,
+                    FROM executed_transactions
+                    INNER JOIN tx_hashes
+                        ON tx_hashes.sequence_number = executed_transactions.sequence_number
+                    UNION ALL
+                    SELECT
+                        concat_ws(',', block_number, block_index) AS tx_id,
                         operation as tx,
                         '0x' || encode(eth_hash, 'hex') as hash,
                         priority_op_serialid as pq_id,
@@ -730,22 +733,14 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         null as fail_reason,
                         block_number,
                         created_at,
-                        sequence_number,
+                        executed_priority_operations.sequence_number,
                         Null::bigint as batch_id
-                    from
-                        executed_priority_operations
-                    where
-                        from_account = $1
-                        or
-                        to_account = $1) t
-                order by
-                    block_number desc, created_at desc
-                offset
-                    $2
-                limit
-                    $3
+                    FROM executed_priority_operations 
+                    INNER JOIN tx_hashes
+                        ON tx_hashes.sequence_number = executed_priority_operations.sequence_number
+                    ) t
             )
-            select
+            SELECT
                 tx_id as "tx_id!",
                 hash as "hash?",
                 eth_block as "eth_block?",
@@ -757,9 +752,9 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                 coalesce(verified.confirmed, false) as "verified!",
                 created_at as "created_at!",
                 batch_id as "batch_id?"
-            from transactions
+            FROM transactions
             LEFT JOIN aggr_exec verified ON transactions.block_number = verified.block_number
-            order by transactions.block_number desc, sequence_number desc
+            ORDER BY transactions.block_number DESC, sequence_number DESC
             "#,
             address.as_ref(), offset as i64, limit as i64
         ).fetch_all(transaction.conn())
@@ -811,6 +806,51 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(tx_history)
     }
 
+    async fn get_closest_sequence_number(
+        &mut self,
+        block_number: i64,
+        block_index: i32,
+        direction: SearchDirection,
+    ) -> QueryResult<Option<i64>> {
+        if block_number == 0 {
+            return Ok(Some(0));
+        }
+        let (function, function2) = match direction {
+            SearchDirection::Older => ("MAX", "GREATEST"),
+            SearchDirection::Newer => ("MIN", "LEAST"),
+        };
+        let query = format!(
+            r#"
+            SELECT COALESCE(
+                (SELECT {1}(
+                    (
+                        SELECT {0}(sequence_number) as sequence_number
+                        FROM executed_transactions
+                        WHERE block_number=$1 AND block_index=$2
+                    ),
+                    (
+                        SELECT {0}(sequence_number) AS sequence_number
+                        FROM executed_priority_operations
+                        WHERE block_number=$1 AND block_index=$2
+                    )
+                )),
+                (SELECT {1}(
+                    (SELECT {0}(sequence_number) as sequence_number FROM executed_transactions WHERE block_number=$1),
+                    (SELECT {0}(sequence_number) as sequence_number FROM executed_priority_operations WHERE block_number=$1)
+                ) + 1),
+                (SELECT {0}(sequence_number) + 1 FROM tx_filters)
+            )
+            "#,
+            function, function2
+        );
+        let tx_seq_no: Option<i64> = sqlx::query_scalar(&query)
+            .bind(block_number as i32)
+            .bind(block_index)
+            .fetch_one(self.0.conn())
+            .await?;
+        Ok(tx_seq_no)
+    }
+
     /// Loads the range of the transactions applied to the account starting
     /// from the specified transaction ID.
     ///
@@ -829,21 +869,44 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
         let start = Instant::now();
         let mut transaction = self.0.start_transaction().await?;
-        // Filter for txs that older/newer than provided tx ID.
-        // For older blocks, block number should be between 0 and block number - 1,
-        // or for the same block number, transaction in block should be between 0 and tx in block number - 1.
-        // For newer filter range starts on the ID + 1 and ends in the max value for the type correspondingly.
+
         let (block_id, block_tx_id) = tx_id;
-        let (block_number_start_idx, block_number_end_idx) = match direction {
-            SearchDirection::Older => (0i64, block_id as i64 - 1), // Older blocks have lesser block ID.
-            SearchDirection::Newer => (block_id as i64 + 1, i64::MAX), // Newer blocks have greater block ID.
+        let sequence_number = transaction
+            .chain()
+            .operations_ext_schema()
+            .get_closest_sequence_number(block_id as i64, block_tx_id as i32, direction)
+            .await?;
+        let sequence_number = if let Some(sequence_number) = sequence_number {
+            sequence_number
+        } else {
+            // If the tx with provided data doesn't exist we return empty vector
+            return Ok(vec![]);
         };
-        let (tx_number_start_idx, tx_number_end_idx) = match direction {
-            SearchDirection::Older => (0i32, block_tx_id as i32 - 1),
-            SearchDirection::Newer => (block_tx_id as i32 + 1, i32::MAX),
+
+        let (pagination_query, order_query) = match direction {
+            SearchDirection::Older => (
+                "SELECT DISTINCT sequence_number FROM tx_filters
+                WHERE address = $1
+                AND sequence_number < $2
+                ORDER BY sequence_number DESC 
+                LIMIT $3
+                ",
+                "ORDER BY transactions.block_number DESC, transactions.sequence_number DESC",
+            ),
+            SearchDirection::Newer => (
+                "
+                SELECT DISTINCT sequence_number FROM tx_filters
+                WHERE address = $1
+                AND sequence_number > $2
+                ORDER BY sequence_number DESC
+                LIMIT $3
+                ",
+                "ORDER BY transactions.block_number DESC, transactions.sequence_number DESC",
+            ),
         };
 
         // This query does the following:
+        // - Paginate txs using tx_filters table
         // - creates a union of `executed_transactions` and the `executed_priority_operations`
         // - unifies the information to match the `TransactionsHistoryItem`
         //   structure layout
@@ -854,32 +917,30 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         //   same way as it done for "verified" flag. Later we've decided that if tx was added
         //   to the `executed_*` table, it actually **is** committed, thus now we just add
         //   `true`.
-        let mut tx_history = sqlx::query_as!(
-            TransactionsHistoryItem,
+        let query = format!(
             r#"
             WITH aggr_comm AS (
-                SELECT 
-                   aggregate_operations.confirmed, 
-                   commit_aggregated_blocks_binding.block_number 
+                SELECT
+                   aggregate_operations.confirmed,
+                   commit_aggregated_blocks_binding.block_number
                FROM aggregate_operations
                    INNER JOIN commit_aggregated_blocks_binding ON aggregate_operations.id = commit_aggregated_blocks_binding.op_id
-               WHERE aggregate_operations.confirmed = true 
+               WHERE aggregate_operations.confirmed = true
             ), aggr_exec AS (
-                SELECT 
-                   aggregate_operations.confirmed, 
-                   execute_aggregated_blocks_binding.block_number 
+                SELECT
+                   aggregate_operations.confirmed,
+                   execute_aggregated_blocks_binding.block_number
                FROM aggregate_operations
                    INNER JOIN execute_aggregated_blocks_binding ON aggregate_operations.id = execute_aggregated_blocks_binding.op_id
-               WHERE aggregate_operations.confirmed = true 
+               WHERE aggregate_operations.confirmed = true
             ), tx_hashes AS (
-                SELECT DISTINCT tx_hash FROM tx_filters
-                WHERE address = $1
-            ), transactions as (
-                select
+                {}
+            ), transactions AS (
+                SELECT
                     *
-                from (
-                    select
-                        concat_ws(',', block_number, block_index) as tx_id,
+                FROM (
+                    SELECT
+                        concat_ws(',', block_number, block_index) AS tx_id,
                         tx,
                         'sync-tx:' || encode(executed_transactions.tx_hash, 'hex') as hash,
                         null as pq_id,
@@ -888,16 +949,14 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         fail_reason,
                         block_number,
                         created_at,
-                        sequence_number,
+                        executed_transactions.sequence_number,
                         batch_id
-                    from tx_hashes
-                    inner join executed_transactions
-                        on tx_hashes.tx_hash = executed_transactions.tx_hash
-                    where
-                        block_number BETWEEN $3 AND $4 or (block_number = $2 and block_index BETWEEN $5 AND $6)
-                    union all
-                    select
-                        concat_ws(',', block_number, block_index) as tx_id,
+                    FROM executed_transactions
+                    INNER JOIN tx_hashes
+                        ON tx_hashes.sequence_number = executed_transactions.sequence_number
+                    UNION ALL
+                    SELECT
+                        concat_ws(',', block_number, block_index) AS tx_id,
                         operation as tx,
                         '0x' || encode(eth_hash, 'hex') as hash,
                         priority_op_serialid as pq_id,
@@ -906,50 +965,42 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
                         null as fail_reason,
                         block_number,
                         created_at,
-                        sequence_number,
+                        executed_priority_operations.sequence_number,
                         Null::bigint as batch_id
-                    from 
+                    FROM
                         executed_priority_operations
-                    where 
-                        (
-                            from_account = $1
-                            or
-                            to_account = $1
-                        )
-                        and
-                        (block_number BETWEEN $3 AND $4 or (block_number = $2 and block_index BETWEEN $5 AND $6))
+                    INNER JOIN tx_hashes
+                        ON tx_hashes.sequence_number = executed_priority_operations.sequence_number
                     ) t
-                order by
-                    sequence_number desc
-                limit 
-                    $7
             )
-            select
-                tx_id as "tx_id!",
-                hash as "hash?",
-                eth_block as "eth_block?",
-                pq_id as "pq_id?",
-                tx as "tx!",
-                success as "success?",
-                fail_reason as "fail_reason?",
-                true as "commited!",
-                coalesce(verified.confirmed, false) as "verified!",
-                created_at as "created_at!",
-                batch_id as "batch_id?"
-            from transactions
-            left join aggr_comm committed on
+            SELECT
+                tx_id,
+                hash,
+                eth_block,
+                pq_id,
+                tx,
+                success,
+                fail_reason,
+                true as commited,
+                coalesce(verified.confirmed, false) as verified,
+                created_at ,
+                batch_id 
+            FROM transactions
+            LEFT JOIN aggr_comm committed ON
                 committed.block_number = transactions.block_number AND committed.confirmed = true
-            left join aggr_exec verified on
+            LEFT JOIN aggr_exec verified ON
                 verified.block_number = transactions.block_number AND verified.confirmed = true
-            order by transactions.sequence_number desc
+            {}
             "#,
-            address.as_ref(),
-            block_id as i64,
-            block_number_start_idx, block_number_end_idx,
-            tx_number_start_idx, tx_number_end_idx,
-            limit as i64
-        ).fetch_all(transaction.conn())
-        .await?;
+            pagination_query, order_query
+        );
+
+        let mut tx_history: Vec<TransactionsHistoryItem> = sqlx::query_as(&query)
+            .bind(address.as_bytes())
+            .bind(sequence_number)
+            .bind(limit as i64)
+            .fetch_all(transaction.conn())
+            .await?;
 
         if !tx_history.is_empty() {
             let tokens = transaction.tokens_schema().load_tokens().await?;
@@ -1171,7 +1222,7 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
 
         Ok(sqlx::query_as(&query)
             .bind(address.as_bytes())
-            .bind(&second_address.as_bytes())
+            .bind(second_address.as_bytes())
             .bind(token.unwrap_or_default().0 as i32)
             .bind(id_from)
             .bind(limit)
@@ -1349,6 +1400,88 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
         Ok(record.map(|record| TxHash::from_slice(&record.tx_hash).unwrap()))
     }
 
+    // TODO Remove it after migration is complete
+    pub async fn get_accounts_range(
+        &mut self,
+        start_account: Option<Address>,
+        limit: u32,
+    ) -> Option<(Address, Address)> {
+        let start_account = match start_account {
+            None => {
+                let address = sqlx::query_scalar!(
+                    r#"
+                    SELECT DISTINCT address
+                    FROM tx_filters
+                    ORDER BY address
+                    LIMIT 1
+                "#,
+                )
+                .fetch_one(self.0.conn())
+                .await
+                .unwrap();
+                Address::from_slice(&address)
+            }
+            Some(account) => account,
+        };
+
+        sqlx::query_scalar!(
+            r#"
+            SELECT * FROM ( 
+                SELECT DISTINCT address
+                FROM tx_filters
+                WHERE address > $1
+                ORDER BY address
+                LIMIT $2
+            ) AS a
+            ORDER BY address DESC LIMIT 1
+        "#,
+            start_account.as_bytes(),
+            limit as i32
+        )
+        .fetch_optional(self.0.conn())
+        .await
+        .unwrap()
+        .map(|account| (start_account, Address::from_slice(&account)))
+    }
+
+    // TODO Remove it after migration is complete
+    pub async fn update_txs_count(
+        &mut self,
+        start_account: Address,
+        finish_account: Address,
+    ) -> QueryResult<()> {
+        sqlx::query!(
+            r#"
+            INSERT INTO txs_count (address, token, count)
+            SELECT address,token, COUNT(DISTINCT tx_hash)
+            FROM tx_filters
+            WHERE  address > $1 AND address <= $2
+                GROUP BY (address, token)
+            ON CONFLICT( address, token) DO UPDATE SET count = EXCLUDED.count;
+            "#,
+            start_account.as_bytes(),
+            finish_account.as_bytes(),
+        )
+        .execute(self.0.conn())
+        .await?;
+
+        sqlx::query!(
+            r#"
+            INSERT INTO txs_count (address, token, count)
+            SELECT address, -1, COUNT(DISTINCT tx_hash)
+            FROM tx_filters
+            WHERE address > $1 AND address <= $2
+                GROUP BY (address)
+            ON CONFLICT( address, token) DO UPDATE SET count = EXCLUDED.count;
+            "#,
+            start_account.as_bytes(),
+            finish_account.as_bytes(),
+        )
+        .execute(self.0.conn())
+        .await?;
+        Ok(())
+    }
+
     pub async fn get_account_transactions_count(
         &mut self,
         address: Address,
@@ -1378,18 +1511,19 @@ impl<'a, 'c> OperationsExtSchema<'a, 'c> {
             .await?
             .count
         } else {
+            // Postgresql doesn't support unique indexes for nullable fields, so we have to use
+            // artificial token -1 which means no token
             sqlx::query!(
                 r#"
-                WITH tx_hashes AS (
-                    SELECT DISTINCT tx_hash FROM tx_filters 
-                    WHERE address = $1 AND ($2::boolean OR token = $3)
-                )
-                SELECT COUNT(*) as "count!"
-                FROM tx_hashes
+                  SELECT
+                    count
+                  FROM
+                    txs_count
+                  WHERE address = $1 
+                  AND token = $2
                 "#,
                 address.as_bytes(),
-                token.is_none(),
-                token.unwrap_or_default().0 as i32,
+                token.map(|a| a.0 as i32).unwrap_or(-1)
             )
             .fetch_one(self.0.conn())
             .await?

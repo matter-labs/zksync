@@ -297,7 +297,7 @@ mod tests {
         };
 
         let response = client
-            .block_transactions(&query, &*block_number.to_string())
+            .block_transactions(&query, &block_number.to_string())
             .await?;
         let paginated: Paginated<Transaction, TxHash> = deserialize_response_result(response)?;
         assert_eq!(paginated.pagination.count as usize, expected_txs.len());

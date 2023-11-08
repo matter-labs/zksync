@@ -135,6 +135,7 @@ impl<'a, 'c> StateSchema<'a, 'c> {
                     .await?;
                     nonce_updates.insert(account_id, new_nonce);
                 }
+
                 AccountUpdate::ChangePubKeyHash {
                     ref old_pub_key_hash,
                     ref new_pub_key_hash,

@@ -73,6 +73,7 @@ fn zksync_txs() -> Vec<SignedZkSyncTx> {
         Default::default(),
         None,
         None,
+        None,
     );
 
     let txs = [
@@ -161,6 +162,18 @@ async fn store_load(mut storage: StorageProcessor<'_>) -> QueryResult<()> {
             "sign data changed"
         );
     }
+
+    let hashes: Vec<_> = txs
+        .iter()
+        .take(txs.len() / 2)
+        .map(|tx| tx.tx.hash())
+        .collect();
+
+    let txs_from_db = MempoolSchema(&mut storage)
+        .load_txs(&hashes)
+        .await
+        .expect("Can't load txs");
+    assert_eq!(txs_from_db.len(), txs.len() / 2);
 
     Ok(())
 }

@@ -5,7 +5,7 @@ use parity_crypto::Keccak256;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use zksync_basic_types::{Address, TokenId, H256};
+use zksync_basic_types::{Address, ChainId, TokenId, H256};
 use zksync_crypto::{
     params::{max_account_id, max_processable_token, CURRENT_TX_VERSION},
     PrivateKey,
@@ -14,15 +14,18 @@ use zksync_utils::{format_units, BigUintSerdeAsRadix10Str};
 
 use super::{PackedEthSignature, TimeRange, TxSignature, VerifiedSignatureCache};
 use crate::tx::error::{
-    FEE_AMOUNT_IS_NOT_PACKABLE, INVALID_AUTH_DATA, WRONG_ACCOUNT_ID, WRONG_FEE_ERROR,
-    WRONG_SIGNATURE, WRONG_TIME_RANGE, WRONG_TOKEN_FOR_PAYING_FEE,
+    ChangePubkeySignedDataError, FEE_AMOUNT_IS_NOT_PACKABLE, INVALID_AUTH_DATA, WRONG_ACCOUNT_ID,
+    WRONG_FEE_ERROR, WRONG_SIGNATURE, WRONG_TIME_RANGE, WRONG_TOKEN_FOR_PAYING_FEE,
 };
+
 use crate::{
     account::PubKeyHash,
     helpers::{is_fee_amount_packable, pack_fee_amount},
     tokens::ChangePubKeyFeeTypeArg,
-    tx::error::ChangePubkeySignedDataError,
-    tx::version::TxVersion,
+    tx::{
+        primitives::eip712_signature::{EIP712TypedStructure, Eip712Domain, StructBuilder},
+        version::TxVersion,
+    },
     AccountId, Nonce, TxFeeTypes,
 };
 
@@ -31,11 +34,20 @@ pub enum ChangePubKeyType {
     Onchain,
     ECDSA,
     CREATE2,
+    EIP712,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangePubKeyECDSAData {
+    pub eth_signature: PackedEthSignature,
+    #[serde(default)]
+    pub batch_hash: H256,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangePubKeyEIP712Data {
     pub eth_signature: PackedEthSignature,
     #[serde(default)]
     pub batch_hash: H256,
@@ -72,6 +84,7 @@ pub enum ChangePubKeyEthAuthData {
     Onchain,
     ECDSA(ChangePubKeyECDSAData),
     CREATE2(ChangePubKeyCREATE2Data),
+    EIP712(ChangePubKeyEIP712Data),
 }
 
 impl ChangePubKeyEthAuthData {
@@ -107,6 +120,11 @@ impl ChangePubKeyEthAuthData {
                 bytes.extend_from_slice(code_hash.as_bytes());
                 bytes
             }
+            ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data { eth_signature, .. }) => {
+                let mut bytes = vec![0x4];
+                bytes.extend_from_slice(&eth_signature.serialize_packed());
+                bytes
+            }
         }
     }
 
@@ -115,6 +133,7 @@ impl ChangePubKeyEthAuthData {
             ChangePubKeyEthAuthData::Onchain => ChangePubKeyType::Onchain,
             ChangePubKeyEthAuthData::ECDSA(_) => ChangePubKeyType::ECDSA,
             ChangePubKeyEthAuthData::CREATE2(_) => ChangePubKeyType::CREATE2,
+            ChangePubKeyEthAuthData::EIP712(_) => ChangePubKeyType::EIP712,
         }
     }
 }
@@ -155,6 +174,7 @@ pub struct ChangePubKey {
     /// This fields must be Option<...> because of backward compatibility with first version of ZkSync
     #[serde(flatten)]
     pub time_range: Option<TimeRange>,
+    pub chain_id: Option<ChainId>,
     #[serde(skip)]
     cached_signer: VerifiedSignatureCache,
 }
@@ -178,12 +198,13 @@ impl ChangePubKey {
         time_range: TimeRange,
         signature: Option<TxSignature>,
         eth_signature: Option<PackedEthSignature>,
+        chain_id: Option<ChainId>,
     ) -> Self {
         // TODO: support CREATE2 (ZKS-452)
         let eth_auth_data = Some(
             eth_signature
                 .map(|eth_signature| {
-                    ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+                    ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
                         eth_signature,
                         batch_hash: H256::zero(),
                     })
@@ -203,6 +224,7 @@ impl ChangePubKey {
             eth_auth_data,
             cached_signer: VerifiedSignatureCache::NotCached,
             time_range: Some(time_range),
+            chain_id,
         };
         if signature.is_some() {
             tx.cached_signer = VerifiedSignatureCache::Cached(tx.verify_signature());
@@ -223,6 +245,7 @@ impl ChangePubKey {
         time_range: TimeRange,
         eth_signature: Option<PackedEthSignature>,
         private_key: &PrivateKey,
+        chain_id: Option<ChainId>,
     ) -> Result<Self, TransactionError> {
         let mut tx = Self::new(
             account_id,
@@ -234,6 +257,7 @@ impl ChangePubKey {
             time_range,
             None,
             eth_signature,
+            chain_id,
         );
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         tx.check_correctness()?;
@@ -310,12 +334,18 @@ impl ChangePubKey {
         eth_signed_msg.extend_from_slice(&self.nonce.to_be_bytes());
         eth_signed_msg.extend_from_slice(&self.account_id.to_be_bytes());
         // In case this transaction is not part of a batch, we simply append zeros.
-        if let Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { batch_hash, .. })) =
-            self.eth_auth_data
-        {
-            eth_signed_msg.extend_from_slice(batch_hash.as_bytes());
-        } else {
-            eth_signed_msg.extend_from_slice(H256::default().as_bytes());
+        match &self.eth_auth_data {
+            Some(ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
+                batch_hash, ..
+            })) => {
+                eth_signed_msg.extend_from_slice(batch_hash.as_bytes());
+            }
+            Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { batch_hash, .. })) => {
+                eth_signed_msg.extend_from_slice(batch_hash.as_bytes());
+            }
+            _ => {
+                eth_signed_msg.extend_from_slice(H256::default().as_bytes());
+            }
         }
         if eth_signed_msg.len() != CHANGE_PUBKEY_SIGNATURE_LEN {
             return Err(ChangePubkeySignedDataError::SignedMessageLengthMismatch {
@@ -345,9 +375,9 @@ impl ChangePubKey {
                  nonce: 0x{nonce}\n\
                  account id: 0x{account_id}\
                  \n\n",
-                pubkey = hex::encode(&self.new_pk_hash.data).to_ascii_lowercase(),
-                nonce = hex::encode(&self.nonce.to_be_bytes()).to_ascii_lowercase(),
-                account_id = hex::encode(&self.account_id.to_be_bytes()).to_ascii_lowercase()
+                pubkey = hex::encode(self.new_pk_hash.data).to_ascii_lowercase(),
+                nonce = hex::encode(self.nonce.to_be_bytes()).to_ascii_lowercase(),
+                account_id = hex::encode(self.account_id.to_be_bytes()).to_ascii_lowercase()
             )
             .as_bytes(),
         );
@@ -367,22 +397,38 @@ impl ChangePubKey {
             match eth_auth_data {
                 ChangePubKeyEthAuthData::Onchain => true, // Should query Ethereum to check it
                 ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { eth_signature, .. }) => {
-                    let recovered_address = self
-                        .get_eth_signed_data()
-                        .ok()
-                        .and_then(|msg| eth_signature.signature_recover_signer(&msg).ok());
+                    let recovered_address = self.get_eth_signed_data().ok().and_then(|msg| {
+                        eth_signature
+                            .signature_recover_signer_from_raw_message(&msg)
+                            .ok()
+                    });
                     recovered_address == Some(self.account)
                 }
                 ChangePubKeyEthAuthData::CREATE2(create2_data) => {
                     let create2_address = create2_data.get_address(&self.new_pk_hash);
                     create2_address == self.account
                 }
+                ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
+                    eth_signature, ..
+                }) => {
+                    if let Some(chain_id) = self.chain_id {
+                        let domain = Eip712Domain::new(chain_id);
+                        let data = PackedEthSignature::typed_data_to_signed_bytes(&domain, self);
+                        let recovered_address =
+                            eth_signature.signature_recover_signer_from_hash(data).ok();
+                        recovered_address == Some(self.account)
+                    } else {
+                        vlog::error!("No chain id for EIP712 data. Tx {:?}", &self);
+                        false
+                    }
+                }
             }
         } else if let Some(old_eth_signature) = &self.eth_signature {
-            let recovered_address = self
-                .get_old_eth_signed_data()
-                .ok()
-                .and_then(|msg| old_eth_signature.signature_recover_signer(&msg).ok());
+            let recovered_address = self.get_old_eth_signed_data().ok().and_then(|msg| {
+                old_eth_signature
+                    .signature_recover_signer_from_raw_message(&msg)
+                    .ok()
+            });
             recovered_address == Some(self.account)
         } else {
             true
@@ -415,7 +461,7 @@ impl ChangePubKey {
     pub fn get_ethereum_sign_message_part(&self, token_symbol: &str, decimals: u8) -> String {
         let mut message = format!(
             "Set signing key: {}",
-            hex::encode(&self.new_pk_hash.data).to_ascii_lowercase()
+            hex::encode(self.new_pk_hash.data).to_ascii_lowercase()
         );
         if !self.fee.is_zero() {
             message.push_str(
@@ -518,5 +564,15 @@ impl Display for TransactionError {
             TransactionError::InvalidAuthData => INVALID_AUTH_DATA,
         };
         write!(f, "{}", error)
+    }
+}
+
+impl EIP712TypedStructure for ChangePubKey {
+    const TYPE_NAME: &'static str = "ChangePubKey";
+
+    fn build_structure<BUILDER: StructBuilder>(&self, builder: &mut BUILDER) {
+        builder.add_member("pubKeyHash", &self.new_pk_hash.data);
+        builder.add_member("nonce", &self.nonce.0);
+        builder.add_member("accountId", &self.account_id.0);
     }
 }

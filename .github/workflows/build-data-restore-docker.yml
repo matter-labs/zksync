@@ -1,0 +1,54 @@
+name: Build and Push Data-restore docker Image
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Ref to build from'
+        required: true
+        default: 'dev'
+
+jobs:
+  build-push-image:
+    runs-on: [matterlabs-ci-runner]
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.inputs.ref }}
+
+    - name: Set outputs
+      id: vars
+      run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+    - name: setup-env
+      run: |
+        echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+        echo CI=1 >> $GITHUB_ENV
+        echo $(pwd)/bin >> $GITHUB_PATH
+
+    - name: start-services
+      run: |
+        docker-compose -f docker-compose-runner.yml down
+        docker-compose -f docker-compose-runner.yml up -d zk postgres
+
+    - name: init
+      run: |
+        ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
+        ci_run git config --global --add safe.directory /usr/src/zksync
+        ci_run git config --global --add safe.directory /usr/src/zksync/sdk/binaryen
+        ci_run zk
+        ci_run zk run yarn
+        ci_run zk run verify-keys unpack
+        ci_run zk contract build
+        ci_run zk db basic-setup
+
+    - name: update-images
+      run: |
+        ci_run docker login -u ${{ secrets.DOCKERHUB_USER }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+        ci_run gcloud auth configure-docker us-docker.pkg.dev -q
+        ci_run zk docker push data-restore
+
+    - name: docker-down
+      if: always()
+      run: |
+        docker-compose -f docker-compose-runner.yml down

@@ -306,11 +306,7 @@ impl<W: EthClient> EthWatch<W> {
         let mut events = self.eth_state.new_register_nft_factory_events().to_vec();
 
         if let Some(last_block_number) = last_block_number {
-            events = events
-                .iter()
-                .filter(|event| event.eth_block > last_block_number)
-                .cloned()
-                .collect();
+            events.retain(|event| event.eth_block > last_block_number);
         }
 
         events
@@ -319,11 +315,7 @@ impl<W: EthClient> EthWatch<W> {
         let mut new_tokens = self.eth_state.new_tokens().to_vec();
 
         if let Some(last_block_number) = last_block_number {
-            new_tokens = new_tokens
-                .iter()
-                .filter(|token| token.eth_block_number > last_block_number)
-                .cloned()
-                .collect();
+            new_tokens.retain(|token| token.eth_block_number > last_block_number);
         }
 
         new_tokens

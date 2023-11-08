@@ -61,7 +61,7 @@ impl Serialize for PackedSignature {
         S: Serializer,
     {
         let packed_signature = self.serialize_packed().map_err(serde::ser::Error::custom)?;
-        serializer.serialize_str(&hex::encode(&packed_signature))
+        serializer.serialize_str(&hex::encode(packed_signature))
     }
 }
 
@@ -72,7 +72,7 @@ impl<'de> Deserialize<'de> for PackedSignature {
     {
         use serde::de::Error;
         let string = String::deserialize(deserializer)?;
-        let bytes = hex::decode(&string).map_err(Error::custom)?;
+        let bytes = hex::decode(string).map_err(Error::custom)?;
         Self::deserialize_packed(&bytes).map_err(Error::custom)
     }
 }

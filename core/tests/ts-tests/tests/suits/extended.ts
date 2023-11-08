@@ -209,6 +209,7 @@ describe(`Extended tests`, () => {
     it('should fail trying to send tx with wrong signature', async () => {
         await tester.testWrongSignature(alice, bob, token, TX_AMOUNT, providerType);
     });
+
     it('should fail trying to send tx with wrong params', async () => {
         await tester.testApiErrors(alice, bob, token, TX_AMOUNT, providerType);
     });

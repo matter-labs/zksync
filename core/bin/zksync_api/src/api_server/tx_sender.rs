@@ -33,7 +33,7 @@ use zksync_types::{
         EthBatchSignData, EthBatchSignatures, EthSignData, Order, SignedZkSyncTx, TxEthSignature,
         TxEthSignatureVariant, TxHash,
     },
-    AccountId, Address, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
+    AccountId, Address, ChainId, PubKeyHash, Token, TokenId, TokenLike, TxFeeTypes, ZkSyncTx, H160,
 };
 use zksync_utils::{
     big_decimal_to_ratio, biguint_to_big_decimal, ratio_to_scaled_u64, scaled_big_decimal_to_ratio,
@@ -80,6 +80,7 @@ pub struct TxSender {
     pub current_subsidy_type: String,
     pub max_subsidy_usd: Ratio<BigUint>,
     pub subsidized_ips: HashSet<String>,
+    pub chain_id: ChainId,
 }
 
 #[derive(Debug, Error)]
@@ -149,6 +150,7 @@ impl TxSender {
         config: &CommonApiConfig,
         token_config: &TokenConfig,
         mempool_tx_sender: mpsc::Sender<MempoolTransactionRequest>,
+        chain_id: ChainId,
     ) -> Self {
         let max_number_of_transactions_per_batch =
             config.max_number_of_transactions_per_batch as usize;
@@ -172,6 +174,7 @@ impl TxSender {
             current_subsidy_type: config.subsidy_name.clone(),
             max_subsidy_usd: config.max_subsidy_usd(),
             subsidized_ips: config.subsidized_ips.clone().into_iter().collect(),
+            chain_id,
         }
     }
 
@@ -483,7 +486,7 @@ impl TxSender {
 
     pub async fn submit_tx(
         &self,
-        tx: ZkSyncTx,
+        mut tx: ZkSyncTx,
         signature: TxEthSignatureVariant,
         extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TxHash, SubmitError> {
@@ -502,6 +505,9 @@ impl TxSender {
         if let ZkSyncTx::ForcedExit(forced_exit) = &tx {
             self.check_forced_exit(forced_exit).await?;
         }
+        if let ZkSyncTx::ChangePubKey(change_pub_key) = &mut tx {
+            change_pub_key.chain_id = Some(self.chain_id)
+        };
 
         // Resolve the token.
         let token = self.token_info_from_id(tx.token_id()).await?;
@@ -752,7 +758,7 @@ impl TxSender {
 
             // Not enough fee
             if required_normal_fee > user_provided_fee {
-                vlog::error!(
+                vlog::info!(
                     "User provided batch fee in token is too low, required: {}, provided (scaled): {}",
                     required_normal_fee.to_string(),
                     user_provided_fee.to_string(),
@@ -792,7 +798,7 @@ impl TxSender {
             // Scaling the fee required since the price may change between signing the transaction and sending it to the server.
             let scaled_provided_fee_in_usd = scale_user_fee_up(provided_total_usd_fee.clone());
             if required_total_usd_fee > scaled_provided_fee_in_usd {
-                vlog::error!(
+                vlog::info!(
                     "User provided batch fee is too low, required: {}, provided: {} (scaled: {}); difference {}",
                     &required_total_usd_fee,
                     provided_total_usd_fee.to_string(),

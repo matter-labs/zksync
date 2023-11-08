@@ -43,7 +43,7 @@ fn bench_signature_verify_eth_packed(b: &mut Bencher<'_>) {
     b.iter_batched(
         setup,
         |(signature, msg)| {
-            let _ = black_box(signature.signature_recover_signer(&msg));
+            let _ = black_box(signature.signature_recover_signer_from_raw_message(&msg));
         },
         BatchSize::SmallInput,
     );

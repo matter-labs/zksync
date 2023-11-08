@@ -16,12 +16,4 @@ contract ZkSyncWithdrawalUnitTest is ZkSync {
 
     // solhint-disable-next-line no-empty-blocks
     function receiveETH() external payable {}
-
-    function withdrawOrStoreExternal(
-        uint16 _tokenId,
-        address _recipient,
-        uint128 _amount
-    ) external {
-        return withdrawOrStore(_tokenId, _recipient, _amount);
-    }
 }

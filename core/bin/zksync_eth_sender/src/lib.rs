@@ -2,6 +2,7 @@
 //! occurring in `ZKSync` with the Ethereum blockchain by creating
 //! transactions from the operations, sending them and ensuring that
 //! every transaction is executed successfully and confirmed.
+#![allow(clippy::derive_partial_eq_without_eq)]
 
 // Built-in deps
 use std::collections::VecDeque;

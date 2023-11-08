@@ -21,7 +21,7 @@ impl LoadtestRng {
         let seed: [u8; SEED_SIZE] = seed_hex
             .map(|seed_str| {
                 let mut output = [0u8; SEED_SIZE];
-                let decoded_seed = hex::decode(&seed_str).expect("Incorrect seed hex");
+                let decoded_seed = hex::decode(seed_str).expect("Incorrect seed hex");
                 output.copy_from_slice(decoded_seed.as_ref());
                 output
             })
@@ -39,7 +39,7 @@ impl LoadtestRng {
     }
 
     pub fn seed_hex(&self) -> String {
-        hex::encode(&self.seed)
+        hex::encode(self.seed)
     }
 
     pub fn derive(&self, eth_pk: H256) -> Self {

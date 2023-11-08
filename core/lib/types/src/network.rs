@@ -6,6 +6,7 @@ use std::{fmt, str::FromStr};
 
 // External uses
 use serde::{Deserialize, Serialize};
+use zksync_basic_types::ChainId;
 
 // Workspace uses
 
@@ -64,8 +65,8 @@ impl fmt::Display for Network {
 
 impl Network {
     /// Returns the network chain ID on the Ethereum side.
-    pub fn chain_id(self) -> u64 {
-        match self {
+    pub fn chain_id(self) -> ChainId {
+        let res = match self {
             Network::Mainnet => 1,
             Network::Ropsten => 3,
             Network::Rinkeby => 4,
@@ -73,6 +74,7 @@ impl Network {
             Network::Localhost => 9,
             Network::Unknown => panic!("Unknown chain ID"),
             Network::Test => panic!("Test chain ID"),
-        }
+        };
+        ChainId(res)
     }
 }

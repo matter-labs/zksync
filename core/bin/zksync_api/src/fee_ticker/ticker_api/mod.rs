@@ -105,7 +105,7 @@ impl<T: TokenPriceAPI + Send + Sync> FeeTickerAPI for TickerApi<T> {
             if let Ok(tokens) = self.get_all_tokens().await {
                 for token in &tokens {
                     if let Err(e) = self.update_price(token).await {
-                        vlog::error!(
+                        vlog::warn!(
                             "Can't update price for token {}. Error: {}",
                             token.symbol,
                             e

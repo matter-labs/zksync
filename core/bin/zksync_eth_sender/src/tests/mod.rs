@@ -285,7 +285,7 @@ async fn operation_commitment_workflow() {
             .ethereum
             .get_mock()
             .unwrap()
-            .assert_sent(&expected_tx.used_tx_hashes[0].as_bytes().to_vec())
+            .assert_sent(expected_tx.used_tx_hashes[0].as_bytes())
             .await;
 
         // Increment block, make the transaction look successfully executed, and process the
@@ -391,7 +391,7 @@ async fn stuck_transaction() {
         .ethereum
         .get_mut_mock()
         .unwrap()
-        .assert_sent(&expected_sent_tx.hash.as_bytes().to_vec())
+        .assert_sent(expected_sent_tx.hash.as_bytes())
         .await;
 
     // Increment block, make the transaction look successfully executed, and process the
@@ -525,7 +525,7 @@ async fn operations_order() {
             .ethereum
             .get_mock()
             .unwrap()
-            .assert_sent(&current_tx_hash.as_bytes().to_vec())
+            .assert_sent(current_tx_hash.as_bytes())
             .await;
 
         // Mark the tx as successfully
@@ -802,7 +802,7 @@ async fn confirmations_independence() {
         .ethereum
         .get_mut_mock()
         .unwrap()
-        .assert_sent(&next_tx.hash.as_bytes().to_vec())
+        .assert_sent(next_tx.hash.as_bytes())
         .await;
 
     // Add a confirmation for a *stuck* transaction.
@@ -946,7 +946,7 @@ async fn concurrent_operations_order() {
                 .ethereum
                 .get_mock()
                 .unwrap()
-                .assert_sent(&current_tx_hash.as_bytes().to_vec())
+                .assert_sent(current_tx_hash.as_bytes())
                 .await;
 
             // Mark the tx as successfully

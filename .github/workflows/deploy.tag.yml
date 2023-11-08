@@ -1,0 +1,88 @@
+name: Deploy from tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy."
+        required: true
+        type: choice
+        options:
+        - goerli
+        - mainnet
+
+
+# Disable simultaneous deployments into a single environment
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    name: Setup
+    uses: ./.github/workflows/setup.runtime.yml
+    with:
+      find-latest-config: true
+      create-deployment: true
+      environment: ${{ inputs.environment }}
+    secrets:
+      github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
+
+  update-config-validation:
+    runs-on: [matterlabs-deployer-stage]
+    needs: setup
+    outputs:
+      skip: ${{ steps.validation.outputs.skip }}
+    steps:
+     - name: Validation
+       id: validation
+       run: |
+        if [ ${{ needs.setup.outputs.config-tag }} = "" ]; then
+          echo "skip=true" >> $GITHUB_OUTPUT
+        else
+          echo "skip=false" >> $GITHUB_OUTPUT
+        fi
+
+  update:
+    name: Update
+    uses: ./.github/workflows/server.update-config.yml
+    needs: [setup, update-config-validation]
+    with:
+      skip-update: ${{ fromJson(needs.update-config-validation.outputs.skip) }}
+      ref: ${{ needs.setup.outputs.config-tag }}
+      cluster: ${{ needs.setup.outputs.cluster }}
+      environment: ${{ needs.setup.outputs.environment }}
+      namespace: ${{ needs.setup.outputs.release-namespace }}
+    secrets:
+      github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
+
+  deploy:
+    name: Deploy
+    uses: ./.github/workflows/deploy.yml
+    needs: [setup, update]
+    with:
+      cluster: ${{ needs.setup.outputs.cluster }}
+      environment: ${{ needs.setup.outputs.environment }}
+      release-environment: ${{ needs.setup.outputs.release-environment }}
+      release-namespace: ${{ needs.setup.outputs.release-namespace }}
+      deployment-id: ${{ needs.setup.outputs.deployment-id }}
+      image-tag: ${{ needs.setup.outputs.sha-short }}
+    secrets:
+      github-token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
+
+  # notify:
+  #   runs-on: ubuntu-latest
+  #   needs: [deploy]
+  #   if: always() && !cancelled()
+  #   steps:
+  #     - uses: technote-space/workflow-conclusion-action@482bb0dbebad067b3b26ca4f6222c4023cf51ccf # v2
+  #     -
+  #       name: Notify to Mattermost (on incidents)
+  #       uses: tferreira/matterfy@releases/v1
+  #       if: ${{ env.WORKFLOW_CONCLUSION == 'failure' }}
+  #       with:
+  #         type: failure
+  #         job_name: '*Deploy to `${{ needs.setup.outputs.environment }}` failed*'
+  #         icon_emoji: octocat
+  #         channel: 'ci-notifications'
+  #         url: ${{ secrets.MATTERMOST_WEBHOOK }}

@@ -7,11 +7,12 @@ use zksync_crypto::PrivateKey;
 use zksync_eth_signer::{error::SignerError, EthereumSigner};
 use zksync_types::{
     tx::{
-        ChangePubKey, ChangePubKeyECDSAData, ChangePubKeyEthAuthData, PackedEthSignature,
-        TimeRange, TxEthSignature,
+        eip712_signature::Eip712Domain, ChangePubKey, ChangePubKeyECDSAData,
+        ChangePubKeyEIP712Data, ChangePubKeyEthAuthData, PackedEthSignature, TimeRange,
+        TxEthSignature,
     },
-    AccountId, Address, ForcedExit, MintNFT, Nonce, PubKeyHash, Token, TokenId, Transfer, Withdraw,
-    WithdrawNFT, H256,
+    AccountId, Address, ChainId, ForcedExit, MintNFT, Nonce, PubKeyHash, Token, TokenId, Transfer,
+    Withdraw, WithdrawNFT, H256,
 };
 // Local imports
 use crate::WalletCredentials;
@@ -75,10 +76,13 @@ impl<S: EthereumSigner> Signer<S> {
         self.account_id
     }
 
-    pub async fn sign_change_pubkey_tx(
+    #[deprecated]
+    #[doc(hidden)]
+    /// This method required only for backward compatibility with tests.
+    /// You should use `sign_change_pubkey_tx` method with EIP712 ChangePubKey for offchain signature
+    pub async fn __old_sign_change_pubkey_tx_ecdsa(
         &self,
         nonce: Nonce,
-        auth_onchain: bool,
         fee_token: Token,
         fee: BigUint,
         time_range: TimeRange,
@@ -95,6 +99,64 @@ impl<S: EthereumSigner> Signer<S> {
             time_range,
             None,
             &self.private_key,
+            None,
+        )
+        .map_err(signing_failed_error)?;
+
+        let eth_signer = self
+            .eth_signer
+            .as_ref()
+            .ok_or(SignerError::MissingEthSigner)?;
+
+        let sign_bytes = change_pubkey
+            .get_eth_signed_data()
+            .map_err(signing_failed_error)?;
+        let eth_signature = eth_signer
+            .sign_message(&sign_bytes)
+            .await
+            .map_err(signing_failed_error)?;
+
+        let eth_signature = match eth_signature {
+            TxEthSignature::EthereumSignature(packed_signature) => Ok(packed_signature),
+            TxEthSignature::EIP1271Signature(..) => Err(SignerError::CustomError(
+                "Can't sign ChangePubKey message with EIP1271 signer".to_string(),
+            )),
+        }?;
+
+        change_pubkey.eth_auth_data = Some(ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+            eth_signature,
+            batch_hash: H256::zero(),
+        }));
+        assert!(
+            change_pubkey.is_eth_auth_data_valid(),
+            "eth auth data is incorrect"
+        );
+
+        Ok(change_pubkey)
+    }
+
+    pub async fn sign_change_pubkey_tx(
+        &self,
+        nonce: Nonce,
+        auth_onchain: bool,
+        fee_token: Token,
+        fee: BigUint,
+        time_range: TimeRange,
+        chain_id: Option<ChainId>,
+    ) -> Result<ChangePubKey, SignerError> {
+        let account_id = self.account_id.ok_or(SignerError::NoSigningKey)?;
+
+        let mut change_pubkey = ChangePubKey::new_signed(
+            account_id,
+            self.address,
+            self.pubkey_hash,
+            fee_token.id,
+            fee,
+            nonce,
+            time_range,
+            None,
+            &self.private_key,
+            chain_id,
         )
         .map_err(signing_failed_error)?;
 
@@ -106,26 +168,21 @@ impl<S: EthereumSigner> Signer<S> {
                 .as_ref()
                 .ok_or(SignerError::MissingEthSigner)?;
 
-            let sign_bytes = change_pubkey
-                .get_eth_signed_data()
-                .map_err(signing_failed_error)?;
+            let chain_id = chain_id.ok_or_else(|| {
+                SignerError::CustomError("Can't sign eip712 without chain id".to_string())
+            })?;
+            let domain = Eip712Domain::new(chain_id);
             let eth_signature = eth_signer
-                .sign_message(&sign_bytes)
+                .sign_typed_data(&domain, &change_pubkey)
                 .await
-                .map_err(signing_failed_error)?;
+                .map_err(|err| SignerError::SigningFailed(err.to_string()))?;
 
-            let eth_signature = match eth_signature {
-                TxEthSignature::EthereumSignature(packed_signature) => Ok(packed_signature),
-                TxEthSignature::EIP1271Signature(..) => Err(SignerError::CustomError(
-                    "Can't sign ChangePubKey message with EIP1271 signer".to_string(),
-                )),
-            }?;
-
-            ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+            ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
                 eth_signature,
-                batch_hash: H256::zero(),
+                batch_hash: Default::default(),
             })
         };
+
         change_pubkey.eth_auth_data = Some(eth_auth_data);
 
         assert!(

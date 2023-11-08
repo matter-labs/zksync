@@ -300,6 +300,7 @@ mod tests {
                 Default::default(),
                 None,
                 None,
+                None,
             ),
             account_id: AccountId(1),
         };
@@ -502,6 +503,7 @@ mod tests {
                 Default::default(),
                 Default::default(),
                 Default::default(),
+                None,
                 None,
                 None,
             ),

@@ -1,4 +1,5 @@
 // Built-in
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -421,6 +422,8 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                 };
 
                 // Start pool maintainer threads.
+                let cache = Arc::new(RwLock::new(BTreeMap::default()));
+
                 for offset in 0..witness_generator_opts.witness_generators {
                     let start_block = (last_verified_block + offset + 1) as u32;
                     let block_step = witness_generator_opts.witness_generators as u32;
@@ -429,11 +432,14 @@ pub fn run_prover_server<DB: DatabaseInterface>(
                         start_block,
                         block_step
                     );
+                    let start_wait = witness_generator_opts.prepare_data_interval() * offset as u32;
                     let pool_maintainer = witness_generator::WitnessGenerator::new(
                         database.clone(),
                         witness_generator_opts.prepare_data_interval(),
+                        start_wait,
                         BlockNumber(start_block),
                         BlockNumber(block_step),
+                        cache.clone(),
                     );
                     pool_maintainer.start(panic_sender.clone());
                 }

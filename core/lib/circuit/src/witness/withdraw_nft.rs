@@ -69,12 +69,12 @@ impl Witness for WithdrawNFTWitness<Bn256> {
         let time_range = withdraw_nft.tx.time_range;
         let withdraw_nft_data = WithdrawNFTData {
             fee: withdraw_nft.tx.fee.to_u128().unwrap(),
-            fee_token: *withdraw_nft.tx.fee_token as u32,
+            fee_token: *withdraw_nft.tx.fee_token,
             initiator_account_id: *withdraw_nft.tx.account_id,
             creator_account_id: *withdraw_nft.creator_id,
             nft_serial_id: withdraw_nft.serial_id,
             content_hash: withdraw_nft.content_hash,
-            token: *withdraw_nft.tx.token as u32,
+            token: *withdraw_nft.tx.token,
             to_address: eth_address_to_fr(&withdraw_nft.tx.to),
             valid_from: time_range.valid_from,
             valid_until: time_range.valid_until,
@@ -374,7 +374,7 @@ impl WithdrawNFTWitness<Bn256> {
                 byte_as_bits
             })
             .flatten()
-            .map(|bit| Some(fr_from(&bit)))
+            .map(|bit| Some(fr_from(bit)))
             .collect();
 
         WithdrawNFTWitness {
@@ -387,8 +387,8 @@ impl WithdrawNFTWitness<Bn256> {
                 fee: Some(fee_encoded),
                 a: Some(a),
                 b: Some(b),
-                valid_from: Some(fr_from(&valid_from)),
-                valid_until: Some(fr_from(&valid_until)),
+                valid_from: Some(fr_from(valid_from)),
+                valid_until: Some(fr_from(valid_until)),
                 special_eth_addresses: vec![
                     Some(
                         creator_account_witness_fourth_chunk
@@ -431,7 +431,7 @@ impl WithdrawNFTWitness<Bn256> {
                 },
             },
             special_account_third_chunk: OperationBranch {
-                address: Some(fr_from(&NFT_STORAGE_ACCOUNT_ID.0)),
+                address: Some(fr_from(NFT_STORAGE_ACCOUNT_ID.0)),
                 token: Some(token_fe),
                 witness: OperationBranchWitness {
                     account_witness: special_account_witness_third_chunk,

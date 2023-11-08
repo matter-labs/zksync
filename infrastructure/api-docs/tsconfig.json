@@ -1,13 +1,13 @@
 {
     "compilerOptions": {
-        "target": "es2019",
         "module": "commonjs",
+        "target": "es6",
+
         "outDir": "build",
-        "strict": true,
         "esModuleInterop": true,
         "noEmitOnError": true,
         "skipLibCheck": true,
-        "declaration": true
+        "declaration": true,
     },
     "files": [
         "src/index.ts"

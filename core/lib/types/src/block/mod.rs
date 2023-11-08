@@ -138,14 +138,14 @@ impl ExecutedOperations {
     /// Unlike public data, some operations may not have a witness.
     pub fn get_eth_witness_bytes(&self) -> Option<Vec<u8>> {
         self.get_executed_op()
-            .map(|op| op.eth_witness().unwrap_or_else(Vec::new))
+            .map(|op| op.eth_witness().unwrap_or_default())
     }
 
     /// Returns the list of accounts affected by the operation.
     pub fn get_updated_account_ids(&self) -> Vec<AccountId> {
         self.get_executed_op()
             .map(|op| op.get_updated_account_ids())
-            .unwrap_or_else(Vec::new)
+            .unwrap_or_default()
     }
 
     /// Returns `true` if the operation was successful.
@@ -416,7 +416,7 @@ impl Block {
                     onchain_ops.push(OnchainOperationsBlockInfo {
                         public_data_offset,
                         eth_witness: executed_op.eth_witness().unwrap_or_default(),
-                    })
+                    });
                 }
 
                 if executed_op.is_processable_onchain_operation() {

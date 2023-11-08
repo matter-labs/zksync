@@ -39,11 +39,11 @@ REQUIRED_SETUP_POWS=`get_required_plonk_setup_powers`
 if [ "$PROVER_DOWNLOAD_SETUP" == "false" ]; then
   echo Downloading setup powers $REQUIRED_SETUP_POWS
 
-  SETUP_DO_SPACE_DIR=https://universal-setup.ams3.digitaloceanspaces.com
+  SETUP_GCS_SPACE_DIR=https://storage.googleapis.com/universal-setup
   mkdir -p keys/setup && pushd keys/setup
 
   for i in ${REQUIRED_SETUP_POWS//,/ }; do
-      axel -c $SETUP_DO_SPACE_DIR/setup_2%5E$i.key || true # don't download file if it is already there
+      axel -c $SETUP_GCS_SPACE_DIR/setup_2%5E$i.key || true # don't download file if it is already there
       sleep 1 # to not receive "503 Slow Down"
   done
 

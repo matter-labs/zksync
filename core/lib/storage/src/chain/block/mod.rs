@@ -494,23 +494,6 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         Ok(details)
     }
 
-    /// Helper method for `find_block_by_height_or_hash`. It checks whether
-    /// provided string can be interpreted like a hash, and if so, returns the
-    /// hexadecimal string without prefix.
-    fn try_parse_hex(&self, query: &str) -> Option<String> {
-        const HASH_STRING_SIZE: usize = 32 * 2; // 32 bytes, 2 symbols per byte.
-
-        if let Some(query) = query.strip_prefix("0x") {
-            Some(query.into())
-        } else if let Some(query) = query.strip_prefix("sync-bl:") {
-            Some(query.into())
-        } else if query.len() == HASH_STRING_SIZE && hex::decode(query).is_ok() {
-            Some(query.into())
-        } else {
-            None
-        }
-    }
-
     /// Performs a database search with an uncertain query, which can be either of:
     /// - Hash of commit/verify Ethereum transaction for the block.
     /// - The state root hash of the block.
@@ -524,17 +507,11 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
     ) -> Option<StorageBlockDetails> {
         let start = Instant::now();
         // If the input looks like hash, add the hash lookup part.
-        let hash_bytes = if let Some(hex_query) = self.try_parse_hex(&query) {
-            // It must be a hexadecimal value, so unwrap is safe.
-            hex::decode(hex_query).unwrap()
-        } else {
-            // Not a hash, provide an empty vector.
-            vec![]
-        };
+        // return an empty vector if it's not a hex string
+        let hash_bytes = conversion::decode_hex_with_prefix(&query).unwrap_or_default();
 
         // If the input can be interpreted as integer, add the block number lookup part.
         let block_number = if let Ok(int_query) = query.parse::<i64>() {
-            // let block_lookup = format!("or blocks.number = {}", int_query);
             int_query
         } else {
             // It doesn't look like a number, provide -1 for no match.
@@ -855,7 +832,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
             .await?;
 
         transaction.commit().await?;
-        metrics::histogram!("sql.chain.block.load_pending_block", start.elapsed());
+        metrics::histogram!("sql.chain.block.save_pending_block", start.elapsed());
 
         Ok(())
     }

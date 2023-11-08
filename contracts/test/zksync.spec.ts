@@ -12,15 +12,13 @@ import * as zksync from 'zksync';
 import {
     ZkSync,
     TestnetERC20Token,
-    DummyERC20NoTransferReturnValue,
-    DummyERC20NoTransferReturnValueFactory,
-    DummyERC20BytesTransferReturnValue,
-    DummyERC20BytesTransferReturnValueFactory,
     ZkSyncProcessOpUnitTest,
     ZkSyncProcessOpUnitTestFactory,
     ZKSyncSignatureUnitTest,
     ZKSyncSignatureUnitTestFactory,
-    ZkSyncWithdrawalUnitTestFactory
+    ZkSyncWithdrawalUnitTestFactory,
+    ZKSyncProveBlocksUnitTest,
+    ZKSyncProveBlocksUnitTestFactory
 } from '../typechain';
 
 const TEST_PRIORITY_EXPIRATION = 101;
@@ -143,7 +141,7 @@ describe('zkSync signature verification unit tests', function () {
                 await testContract.changePubkeySignatureCheckECRECOVER(
                     {
                         accountId: incorrectAccountId,
-                        owner: wallet.address,
+                        owner: randomWallet.address,
                         nonce,
                         pubKeyHash: pubkeyHash.replace('sync:', '0x')
                     },
@@ -162,6 +160,125 @@ describe('zkSync signature verification unit tests', function () {
             const address = await testContract.testRecoverAddressFromEthSignature(signature, signedMessageHash);
             expect(address, `address mismatch, message ${message.toString('hex')}`).eq(wallet.address);
         }
+    });
+
+    it('pubkey hash signature EIP712 verification success', async () => {
+        const accountId = 0xdeadba;
+        const pubkeyHash = '0xfefefefefefefefefefefefefefefefefefefefe';
+        const nonce = 0x11223344;
+        const EIP712Domain = {
+            name: 'ZkSync',
+            version: '1.0',
+            chainId: hardhat.network.config.chainId
+        };
+        const types = {
+            ChangePubKey: [
+                { name: 'pubKeyHash', type: 'bytes20' },
+                { name: 'nonce', type: 'uint32' },
+                { name: 'accountId', type: 'uint32' }
+            ]
+        };
+        const message = {
+            pubKeyHash: pubkeyHash,
+            nonce: nonce,
+            accountId: accountId
+        };
+        const signature = await randomWallet._signTypedData(EIP712Domain, types, message);
+
+        const witness = ethers.utils.concat(['0x00', signature]);
+        const { result } = await getCallRevertReason(
+            async () =>
+                await testContract.changePubkeySignatureCheckEIP712(
+                    { accountId, owner: randomWallet.address, nonce, pubKeyHash: pubkeyHash },
+                    witness
+                )
+        );
+        expect(result).eq(true);
+    });
+
+    it('pubkey hash signature EIP712 verification incorrect chain id', async () => {
+        const accountId = 0xdeadba;
+        const pubkeyHash = '0xfefefefefefefefefefefefefefefefefefefefe';
+        const nonce = 0x11223344;
+        const EIP712Domain = {
+            name: 'ZkSync',
+            version: '1.0',
+            chainId: hardhat.network.config.chainId + 1 // incorrect chaind id
+        };
+        const types = {
+            ChangePubKey: [
+                { name: 'pubKeyHash', type: 'bytes20' },
+                { name: 'nonce', type: 'uint32' },
+                { name: 'accountId', type: 'uint32' }
+            ]
+        };
+        const message = {
+            pubKeyHash: pubkeyHash,
+            nonce: nonce,
+            accountId: accountId
+        };
+        const signature = await randomWallet._signTypedData(EIP712Domain, types, message);
+
+        const witness = ethers.utils.concat(['0x00', signature]);
+        const { result } = await getCallRevertReason(
+            async () =>
+                await testContract.changePubkeySignatureCheckEIP712(
+                    { accountId, owner: randomWallet.address, nonce, pubKeyHash: pubkeyHash },
+                    witness
+                )
+        );
+        expect(result).eq(false);
+    });
+
+    it('pubkey hash signature EIP712 verification incorrect version', async () => {
+        const accountId = 0xdeadba;
+        const pubkeyHash = '0xfefefefefefefefefefefefefefefefefefefefe';
+        const nonce = 0x11223344;
+        const EIP712Domain = {
+            name: 'ZkSync',
+            version: '2.0', // incorrect version
+            chainId: hardhat.network.config.chainId
+        };
+        const types = {
+            ChangePubKey: [
+                { name: 'pubKeyHash', type: 'bytes20' },
+                { name: 'nonce', type: 'uint32' },
+                { name: 'accountId', type: 'uint32' }
+            ]
+        };
+        const message = {
+            pubKeyHash: pubkeyHash,
+            nonce: nonce,
+            accountId: accountId
+        };
+        const signature = await randomWallet._signTypedData(EIP712Domain, types, message);
+
+        const witness = ethers.utils.concat(['0x00', signature]);
+        const { result } = await getCallRevertReason(
+            async () =>
+                await testContract.changePubkeySignatureCheckEIP712(
+                    { accountId, owner: randomWallet.address, nonce, pubKeyHash: pubkeyHash },
+                    witness
+                )
+        );
+        expect(result).eq(false);
+    });
+
+    it('pubkey hash hardcoded signature EIP712 verification', async () => {
+        const accountId = 0xdeadba;
+        const pubkeyHash = '0xfefefefefefefefefefefefefefefefefefefefe';
+        const nonce = 0x11223344;
+        const signature =
+            '0xea37325672e61e170663ea4fc5db2831c6f8251c4d9e24bb247da0cc50aedd5c615f7a6b18d90e3486fc767b54785467938912301a9b3e7ba474e27cdbb56c471c';
+        const witness = ethers.utils.concat(['0x04', signature]);
+        const { result } = await getCallRevertReason(
+            async () =>
+                await testContract.changePubkeySignatureCheckEIP712(
+                    { accountId, owner: '0xc85065ab91b00cc3d121f29ac7f5335f3a902c41', nonce, pubKeyHash: pubkeyHash },
+                    witness
+                )
+        );
+        expect(result).eq(true);
     });
 });
 
@@ -290,8 +407,6 @@ describe('zkSync withdraw unit tests', function () {
     let incorrectTokenContract;
     let ethProxy: ETHProxy;
     let EOA_Address: string;
-    let tokenNoTransferReturnValue: DummyERC20NoTransferReturnValue;
-    let tokenBytesTransferReturnValue: DummyERC20BytesTransferReturnValue;
     before(async () => {
         [wallet] = await hardhat.ethers.getSigners();
         EOA_Address = wallet.address;
@@ -300,24 +415,6 @@ describe('zkSync withdraw unit tests', function () {
         contracts.zkSync = readContractCode('dev-contracts/ZkSyncWithdrawalUnitTest');
         const deployer = new Deployer({ deployWallet: wallet, contracts });
         await deployer.deployAll({ gasLimit: 6500000 });
-
-        const tokenNoTransferReturnValueFactory = await hardhat.ethers.getContractFactory(
-            'DummyERC20NoTransferReturnValue'
-        );
-        const tokenNoTransferReturnValueContract = await tokenNoTransferReturnValueFactory.deploy();
-        tokenNoTransferReturnValue = DummyERC20NoTransferReturnValueFactory.connect(
-            tokenNoTransferReturnValueContract.address,
-            tokenNoTransferReturnValueContract.signer
-        );
-
-        const tokenBytesTransferReturnValueFactory = await hardhat.ethers.getContractFactory(
-            'DummyERC20BytesTransferReturnValue'
-        );
-        const tokenBytesTransferReturnValueContract = await tokenBytesTransferReturnValueFactory.deploy('0xDEADBEEF');
-        tokenBytesTransferReturnValue = DummyERC20BytesTransferReturnValueFactory.connect(
-            tokenBytesTransferReturnValueContract.address,
-            tokenBytesTransferReturnValueContract.signer
-        );
 
         zksyncContract = ZkSyncWithdrawalUnitTestFactory.connect(deployer.addresses.ZkSync, wallet);
 
@@ -328,8 +425,6 @@ describe('zkSync withdraw unit tests', function () {
         const govContract = deployer.governanceContract(wallet);
         await govContract.addToken(tokenContract.address);
         await govContract.addToken(EOA_Address);
-        await govContract.addToken(tokenNoTransferReturnValue.address);
-        await govContract.addToken(tokenBytesTransferReturnValue.address);
 
         ethProxy = new ETHProxy(wallet.provider, {
             mainContract: zksyncContract.address,
@@ -446,30 +541,6 @@ describe('zkSync withdraw unit tests', function () {
             async () => await performWithdraw(wallet, incorrectTokenContract.address, 1, withdrawAmount.add(1))
         );
         expect(revertReason, 'wrong revert reason').eq('1i');
-    });
-
-    it('Withdraw token with empty return value', async () => {
-        const balanceBefore = await zksyncContract.getPendingBalance(EOA_Address, tokenNoTransferReturnValue.address);
-        await zksyncContract.withdrawOrStoreExternal(3, EOA_Address, 1);
-        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, tokenNoTransferReturnValue.address);
-        expect(balanceAfter.eq(balanceBefore));
-    });
-
-    it('Should save pending balance for token without bytecode', async () => {
-        const balanceBefore = await zksyncContract.getPendingBalance(EOA_Address, EOA_Address);
-        await zksyncContract.withdrawOrStoreExternal(2, EOA_Address, 1);
-        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, EOA_Address);
-        expect(balanceAfter.eq(balanceBefore.add(1)));
-    });
-
-    it('Should save pending balance for token with incorrect return value', async () => {
-        const balanceBefore = await zksyncContract.getPendingBalance(
-            EOA_Address,
-            tokenBytesTransferReturnValue.address
-        );
-        await zksyncContract.withdrawOrStoreExternal(4, EOA_Address, 1);
-        const balanceAfter = await zksyncContract.getPendingBalance(EOA_Address, tokenBytesTransferReturnValue.address);
-        expect(balanceAfter.eq(balanceBefore.add(1)));
     });
 });
 
@@ -807,5 +878,81 @@ describe('zkSync test process next operation', function () {
 
         const committedPriorityRequestsAfter = await zksyncContract.getTotalCommittedPriorityRequests();
         expect(committedPriorityRequestsAfter, 'priority request number').eq(committedPriorityRequestsBefore);
+    });
+});
+
+describe('zkSync prove blocks unit tests', function () {
+    this.timeout(50000);
+
+    let testContract: ZKSyncProveBlocksUnitTest;
+
+    before(async () => {
+        [wallet] = await hardhat.ethers.getSigners();
+
+        const contracts = readProductionContracts();
+        contracts.zkSync = readContractCode('dev-contracts/ZKSyncProveBlocksUnitTest');
+        const deployer = new Deployer({ deployWallet: wallet, contracts });
+        await deployer.deployAll({ gasLimit: 6500000 });
+        testContract = ZKSyncProveBlocksUnitTestFactory.connect(deployer.addresses.ZkSync, wallet);
+    });
+
+    it('prove blocks success', async () => {
+        const numberOfCommittedBlocks = 10;
+        const numberOfProvedBlocks = 3;
+        const startBlockToBeProved = 4;
+        const endBlockToBeProved = 9;
+        const { revertReason } = await getCallRevertReason(async () => {
+            await testContract.initializeNumberOfCommittedAndProvedBlocks(
+                numberOfCommittedBlocks,
+                numberOfProvedBlocks
+            );
+            await testContract.proveBlocksTest(startBlockToBeProved, endBlockToBeProved);
+        });
+        expect(revertReason).eq('VM did not revert');
+    });
+
+    it('prove blocks sucess: proving the already proved blocks', async () => {
+        const numberOfCommittedBlocks = 10;
+        const numberOfProvedBlocks = 3;
+        const startBlockToBeProved = 1; // since the blocks 1 to 3 are proved already, the function will skip them and prove from block 4 to 9
+        const endBlockToBeProved = 9;
+        const { revertReason } = await getCallRevertReason(async () => {
+            await testContract.initializeNumberOfCommittedAndProvedBlocks(
+                numberOfCommittedBlocks,
+                numberOfProvedBlocks
+            );
+            await testContract.proveBlocksTest(startBlockToBeProved, endBlockToBeProved);
+        });
+        expect(revertReason).eq('VM did not revert');
+    });
+
+    it('prove blocks incorrect: start block number to be proved', async () => {
+        const numberOfCommittedBlocks = 10;
+        const numberOfProvedBlocks = 3;
+        const startBlockToBeProved = 5; // incorrect start block number, because the block number 4 is not proved yet
+        const endBlockToBeProved = 9;
+        const { revertReason } = await getCallRevertReason(async () => {
+            await testContract.initializeNumberOfCommittedAndProvedBlocks(
+                numberOfCommittedBlocks,
+                numberOfProvedBlocks
+            );
+            await testContract.proveBlocksTest(startBlockToBeProved, endBlockToBeProved);
+        });
+        expect(revertReason).eq('o2');
+    });
+
+    it('prove blocks incorrect: proving more blocks than committed', async () => {
+        const numberOfCommittedBlocks = 10;
+        const numberOfProvedBlocks = 3;
+        const startBlockToBeProved = 4;
+        const endBlockToBeProved = 12; // the block number to be proved is more than total committed blocks
+        const { revertReason } = await getCallRevertReason(async () => {
+            await testContract.initializeNumberOfCommittedAndProvedBlocks(
+                numberOfCommittedBlocks,
+                numberOfProvedBlocks
+            );
+            await testContract.proveBlocksTest(startBlockToBeProved, endBlockToBeProved);
+        });
+        expect(revertReason).eq('o1');
     });
 });

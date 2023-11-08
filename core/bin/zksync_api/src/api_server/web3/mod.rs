@@ -12,6 +12,7 @@ use self::{calls::CallsHelper, logs::LogsHelper, rpc_trait::Web3Rpc};
 
 use tokio::task::JoinHandle;
 use zksync_config::configs::api::{TokenConfig, Web3Config};
+use zksync_types::ChainId;
 
 mod calls;
 mod converter;
@@ -31,7 +32,7 @@ pub struct Web3RpcApp {
     logs_helper: LogsHelper,
     calls_helper: CallsHelper,
     max_block_range: u32,
-    chain_id: u32,
+    chain_id: ChainId,
 }
 
 impl Web3RpcApp {
@@ -45,7 +46,7 @@ impl Web3RpcApp {
             logs_helper: LogsHelper::new(token_config.invalidate_token_cache_period()),
             calls_helper: CallsHelper::new(token_config.invalidate_token_cache_period()),
             max_block_range: config.max_block_range,
-            chain_id: config.chain_id,
+            chain_id: ChainId(config.chain_id),
         }
     }
 

@@ -7,7 +7,7 @@ pub struct EIP1271Signature(pub Vec<u8>);
 
 impl fmt::Display for EIP1271Signature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "EIP1271Signature 0x{}", hex::encode(&self.0.as_slice()))
+        write!(f, "EIP1271Signature 0x{}", hex::encode(self.0.as_slice()))
     }
 }
 
