@@ -27,9 +27,7 @@ impl NoopOp {
     }
 
     pub(crate) fn get_public_data(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        data.resize(Self::CHUNKS * CHUNK_BYTES, 0x00);
-        data
+        vec![0; Self::CHUNKS * CHUNK_BYTES]
     }
 
     pub(crate) fn get_updated_account_ids(&self) -> Vec<AccountId> {

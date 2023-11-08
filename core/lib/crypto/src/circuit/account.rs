@@ -63,7 +63,7 @@ impl<E: RescueEngine> GetBits for CircuitAccount<E> {
         let mut state_tree_hash_bits = state_root.get_bits_le_fixed(params::FR_BIT_WIDTH);
         state_tree_hash_bits.resize(params::FR_BIT_WIDTH_PADDED, false);
 
-        leaf_content.extend(state_tree_hash_bits.into_iter());
+        leaf_content.extend(state_tree_hash_bits);
 
         assert_eq!(
             leaf_content.len(),

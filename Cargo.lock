@@ -481,9 +481,9 @@ checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
 
 [[package]]
 name = "async-trait"
-version = "0.1.51"
+version = "0.1.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44318e776df68115a881de9a8fd1b9e53368d7a4a5ce4cc48517da3393233a5e"
+checksum = "061a7acccaa286c011ddc30970520b98fa40e00c9d644633fb26b5fc63a265e3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1224,22 +1224,12 @@ checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
 name = "crypto-mac"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4434400df11d95d556bac068ddfedd482915eb18fe8bea89bc80b6e4b1c179e5"
-dependencies = [
- "generic-array 0.12.4",
- "subtle 1.0.0",
-]
-
-[[package]]
-name = "crypto-mac"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b584a330336237c1eecd3e94266efb216c56ed91225d634cb2991c5f3fd1aeab"
 dependencies = [
  "generic-array 0.14.4",
- "subtle 2.4.1",
+ "subtle",
 ]
 
 [[package]]
@@ -1249,7 +1239,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bff07008ec701e8028e2ceb8f83f0e4274ee62bd2dbdc4fefff2e9a91824081a"
 dependencies = [
  "generic-array 0.14.4",
- "subtle 2.4.1",
+ "subtle",
 ]
 
 [[package]]
@@ -1259,7 +1249,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1d1a86f49236c215f271d40892d5fc950490551400b02ef360692c29815c714"
 dependencies = [
  "generic-array 0.14.4",
- "subtle 2.4.1",
+ "subtle",
 ]
 
 [[package]]
@@ -1391,15 +1381,6 @@ dependencies = [
  "quote",
  "rustc_version 0.3.3",
  "syn",
-]
-
-[[package]]
-name = "digest"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03b072242a8cbaf9c145665af9d250c59af3b958f83ed6824e13533cf76d5b90"
-dependencies = [
- "generic-array 0.9.1",
 ]
 
 [[package]]
@@ -1657,7 +1638,7 @@ dependencies = [
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta#7b6d409beebec6b699f15eaf7f098cc3628a14ea"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=beta#9e3c2a12053c014df9b6c1f227db4470e02b4c5b"
 dependencies = [
  "bellman_ce",
  "bit-vec",
@@ -1665,9 +1646,9 @@ dependencies = [
  "blake2-rfc_bellman_edition",
  "blake2s_simd",
  "byteorder",
- "digest 0.7.6",
+ "digest 0.9.0",
  "hex",
- "hmac 0.7.1",
+ "hmac 0.11.0",
  "itertools 0.9.0",
  "num-bigint 0.3.3",
  "num-integer",
@@ -1676,7 +1657,7 @@ dependencies = [
  "rand 0.4.6",
  "serde",
  "serde_derive",
- "sha2 0.8.2",
+ "sha2 0.9.8",
  "splitmut",
  "tiny-keccak 1.5.0",
 ]
@@ -1833,15 +1814,6 @@ name = "gcc"
 version = "0.3.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
-
-[[package]]
-name = "generic-array"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d00328cedcac5e81c683e5620ca6a30756fc23027ebf9bff405c0e8da1fbb7e"
-dependencies = [
- "typenum",
-]
 
 [[package]]
 name = "generic-array"
@@ -2008,16 +1980,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
-name = "hmac"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dcb5e64cda4c23119ab41ba960d1e170a774c8e4b9d9e6a9bc18aabf5e59695"
-dependencies = [
- "crypto-mac 0.7.0",
- "digest 0.8.1",
-]
 
 [[package]]
 name = "hmac"
@@ -3194,7 +3156,7 @@ dependencies = [
  "scrypt",
  "secp256k1 0.20.3",
  "sha2 0.9.8",
- "subtle 2.4.1",
+ "subtle",
  "tiny-keccak 2.0.2",
  "zeroize",
 ]
@@ -3218,7 +3180,7 @@ dependencies = [
  "scrypt",
  "secp256k1 0.20.3",
  "sha2 0.9.8",
- "subtle 2.4.1",
+ "subtle",
  "tiny-keccak 2.0.2",
  "zeroize",
 ]
@@ -3377,7 +3339,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "sha2 0.9.8",
- "subtle 2.4.1",
+ "subtle",
 ]
 
 [[package]]
@@ -3952,7 +3914,7 @@ dependencies = [
 [[package]]
 name = "recursive_aggregation_circuit"
 version = "1.0.0"
-source = "git+https://github.com/matter-labs/recursive_aggregation_circuit.git?branch=master#30bbf42c81c08ba8a15dcad3eaca9e771c4d8c89"
+source = "git+https://github.com/matter-labs/recursive_aggregation_circuit.git?branch=master#63c954be7f755d235965a9e0e668813bfd2330eb"
 dependencies = [
  "franklin-crypto",
  "hex",
@@ -4244,7 +4206,7 @@ dependencies = [
  "rand_core 0.5.1",
  "salsa20",
  "sha2 0.9.8",
- "subtle 2.4.1",
+ "subtle",
 ]
 
 [[package]]
@@ -4896,12 +4858,6 @@ dependencies = [
  "quote",
  "syn",
 ]
-
-[[package]]
-name = "subtle"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d67a5a62ba6e01cb2192ff309324cb4875d0c451d55fe2319433abe7a05a8ee"
 
 [[package]]
 name = "subtle"

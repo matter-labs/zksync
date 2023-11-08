@@ -1,3 +1,4 @@
+#![allow(clippy::diverging_sub_expression)]
 use std::collections::HashMap;
 use zksync::{tokens_cache::TokensCache, utils::*, web3::types::H160};
 use zksync_config::test_config::unit_vectors::{Config as TestVectorsConfig, TestEntry};

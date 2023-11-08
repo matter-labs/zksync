@@ -1175,7 +1175,7 @@ async fn test_getting_swap_for_acc(mut storage: StorageProcessor<'_>) -> QueryRe
         .await?;
     commit_schema_data(&mut storage, &setup).await?;
 
-    let addresses_to_check = vec![
+    let addresses_to_check = [
         op.tx.submitter_address,
         setup.from_zksync_account.address,
         setup.to_zksync_account.address,

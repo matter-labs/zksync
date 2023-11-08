@@ -1,3 +1,4 @@
+#![allow(clippy::diverging_sub_expression)]
 // Built-in
 use std::clone::Clone;
 use std::str::FromStr;

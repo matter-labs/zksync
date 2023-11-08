@@ -772,9 +772,7 @@ impl ZkSyncStateKeeper {
             &self.pending_block.collected_fees,
             self.config.fee_account_id,
         );
-        self.pending_block
-            .account_updates
-            .extend(fee_updates.into_iter());
+        self.pending_block.account_updates.extend(fee_updates);
 
         // TODO (ZKS-821): Currently the logic of this procedure is obscure and error-prone.
         // I've met multiple bugs trying to adapt it because it works at the same time with the "old"

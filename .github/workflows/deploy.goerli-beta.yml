@@ -22,6 +22,8 @@ jobs:
         echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
         echo CI=1 >> $GITHUB_ENV
         echo $(pwd)/bin >> $GITHUB_PATH
+        echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> $GITHUB_ENV
+        echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> .env
     -
       name: start-services
       run: |
@@ -30,6 +32,8 @@ jobs:
     -
       name: init
       run: |
+        ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
+        ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
         ci_run git config --global --add safe.directory /usr/src/zksync
         ci_run git config --global --add safe.directory /usr/src/zksync/sdk/binaryen
         ci_run zk

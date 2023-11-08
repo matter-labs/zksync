@@ -882,7 +882,7 @@ mod tests {
         for &(idx, value) in &test_vector[..] {
             let merkle_proof = tree.merkle_path(idx);
 
-            let hasher = TestHasher::default();
+            let hasher = TestHasher;
 
             // To check the proof, we fold it starting from the hash of the value
             // and updating with the hashes from the proof.
@@ -916,7 +916,7 @@ mod tests {
         for &idx in &absent_elements {
             let merkle_proof = tree.merkle_path(idx);
 
-            let hasher = TestHasher::default();
+            let hasher = TestHasher;
 
             // To check the proof, we fold it starting from the hash of the value
             // and updating with the hashes from the proof.

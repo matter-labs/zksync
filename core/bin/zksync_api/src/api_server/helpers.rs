@@ -52,9 +52,7 @@ async fn depositing_from_pending_ops(
 
         let expected_accept_block = op.received_on_block + confirmations_for_eth_event;
 
-        let balance = balances
-            .entry(token_symbol)
-            .or_insert_with(DepositingFunds::default);
+        let balance: &mut DepositingFunds = balances.entry(token_symbol).or_default();
 
         balance.amount += BigUint::from(op.amount);
 

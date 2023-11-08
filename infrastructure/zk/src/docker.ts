@@ -43,6 +43,8 @@ async function _build(image: string) {
     if (image == 'server' || image == 'prover') {
         await contract.build();
     }
+    await utils.spawn(`CARGO_HOME=./cargo cargo fetch`);
+
     const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
     const latestImage = `-t matterlabs/${image}:latest`;
     const taggedImage = ['nginx', 'server', 'prover'].includes(image) ? `-t matterlabs/${image}:${imageTag}` : '';

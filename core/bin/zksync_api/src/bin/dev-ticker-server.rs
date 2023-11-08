@@ -174,9 +174,9 @@ fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
     let goerli_tokens = load_tokens("etc/tokens/goerli.json");
     let data: Vec<TokenData> = localhost_tokens
         .into_iter()
-        .chain(rinkeby_tokens.into_iter())
-        .chain(ropsten_tokens.into_iter())
-        .chain(goerli_tokens.into_iter())
+        .chain(rinkeby_tokens)
+        .chain(ropsten_tokens)
+        .chain(goerli_tokens)
         .collect();
     if sloppy_mode {
         web::scope("")

@@ -54,7 +54,7 @@ impl TxHandler<Deposit> for ZkSyncState {
 
         let mut account = self.get_account(op.account_id).unwrap_or_else(|| {
             let (account, upd) = Account::create_account(op.account_id, op.priority_op.to);
-            updates.extend(upd.into_iter());
+            updates.extend(upd);
             account
         });
 

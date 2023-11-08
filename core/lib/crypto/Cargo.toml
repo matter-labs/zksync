@@ -11,10 +11,13 @@ categories = ["cryptography"]
 readme = "README.md"
 
 [dependencies]
-franklin_crypto = { package = "franklin-crypto", version = "0.0.5", git = "https://github.com/matter-labs/franklin-crypto.git", branch="beta", features = ["multicore", "plonk"]}
-recursive_aggregation_circuit = { package = "recursive_aggregation_circuit", version = "1.0.0", git = "https://github.com/matter-labs/recursive_aggregation_circuit.git", branch="master"}
+franklin_crypto = { package = "franklin-crypto", version = "0.0.5", git = "https://github.com/matter-labs/franklin-crypto.git", branch = "beta", features = [
+    "multicore",
+    "plonk",
+] }
+recursive_aggregation_circuit = { package = "recursive_aggregation_circuit", version = "1.0.0", git = "https://github.com/matter-labs/recursive_aggregation_circuit.git", branch = "master" }
 rand = "0.4"
-rescue_poseidon = { package = "rescue_poseidon", version = "0.3.0", git = "https://github.com/matter-labs/rescue-poseidon.git", branch="stable"}
+rescue_poseidon = { package = "rescue_poseidon", version = "0.3.0", git = "https://github.com/matter-labs/rescue-poseidon.git", branch = "stable" }
 
 num = { version = "0.3.1", features = ["serde"] }
 zksync_basic_types = { path = "../basic_types", version = "1.0" }
@@ -31,4 +34,3 @@ bincode = "2.0.0-rc.1"
 
 [dev-dependencies]
 serde_json = "1.0"
-

@@ -33,6 +33,7 @@ jobs:
 
     - name: init
       run: |
+        ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
         ci_run git config --global --add safe.directory /usr/src/zksync
         ci_run git config --global --add safe.directory /usr/src/zksync/sdk/binaryen
         ci_run zk

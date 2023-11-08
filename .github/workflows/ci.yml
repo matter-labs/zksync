@@ -17,11 +17,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        with:
+          token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
       - name: setup-env
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> $GITHUB_ENV
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> .env
 
       - name: start-services
         run: |
@@ -34,6 +40,10 @@ jobs:
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
 
+      - name: init
+        run: |
+          ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
+
       - name: lints
         run: |
           ci_run zk
@@ -45,11 +55,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        with:
+          token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
       - name: setup-env
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> $GITHUB_ENV
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> .env
 
       - name: start-services
         run: |
@@ -60,6 +76,7 @@ jobs:
 
       - name: init
         run: |
+          ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
           ci_run zk
           ci_run zk run plonk-setup
           ci_run zk run yarn
@@ -87,11 +104,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
+        with:
+          token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
       - name: setup-env
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> $GITHUB_ENV
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> .env
           ## Setup sccache GCS key (update docker-compose .env)
 
       - name: start-services
@@ -103,6 +124,8 @@ jobs:
 
       - name: init
         run: |
+          
+          ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
           ci_run zk
           ci_run zk dummy-prover enable --no-redeploy
           ci_run zk init
@@ -142,15 +165,21 @@ jobs:
           ci_run cat /tmp/sccache_log.txt
 
   circuit-tests:
-    runs-on: [matterlabs-ci-runner]
+    runs-on: [matterlabs-ci-runner-highmem]
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        with:
+          token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
       - name: prepare
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> $GITHUB_ENV
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> .env
 
       - name: start-services
         run: |
@@ -161,6 +190,7 @@ jobs:
 
       - name: init
         run: |
+          ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
           ci_run zk
           ci_run zk run plonk-setup
           ci_run zk run verify-keys unpack
@@ -173,12 +203,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        with:
+          token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
       - name: prepare
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
           echo PLUGIN_CONFIG=fast >> $GITHUB_ENV # use fast mode for geth image (instant tx commit)
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> $GITHUB_ENV
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> .env
 
       - name: start-services
         run: |
@@ -189,6 +225,7 @@ jobs:
 
       - name: init
         run: |
+          ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
           ci_run zk
           ci_run zk run plonk-setup
           ci_run zk run verify-keys unpack
@@ -202,12 +239,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        with:
+          token: ${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}
 
       - name: setup-env
         run: |
           echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
           echo $(pwd)/bin >> $GITHUB_PATH
           ## Setup sccache GCS key (update docker-compose .env)
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> $GITHUB_ENV
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> .env
 
       - name: start-services
         run: |
@@ -218,6 +261,7 @@ jobs:
 
       - name: init
         run: |
+          ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
           ci_run zk
           ci_run zk dummy-prover enable --no-redeploy
           ci_run zk init
@@ -233,7 +277,7 @@ jobs:
 
       - name: loadtest
         run: |
-          ci_run cargo build --release --bin loadnext 
+          ci_run cargo build --release --bin loadnext
           cd $ZKSYNC_HOME
           docker-compose -f docker-compose-runner.yml exec -T -e ALLOWED_PERCENT=20 -e RUST_LOG=loadnext=debug -e ZKSYNC_RPC_ADDR=http://127.0.0.2:3030 -e WEB3_URL=http://geth:8545 -e ETH_NETWORK=localhost -e MASTER_WALLET_PK=74d8b3a188f7260f67698eb44da07397a298df5427df681ef68c45b34b61f998 -e ACCOUNTS_AMOUNT=5 -e OPERATIONS_PER_ACCOUNT=5 -e MAIN_TOKEN=DAI zk ./target/release/loadnext
           docker-compose -f docker-compose-runner.yml exec -T -e ZKSYNC_REST_ADDR=http://127.0.0.2:3001  zk ts-node core/tests/check-block-root-hahes.ts

@@ -25,3 +25,4 @@
 !infrastructure/explorer/dist
 !infrastructure/zk
 !sdk/zksync-rs
+!cargo

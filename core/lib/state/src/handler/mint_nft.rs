@@ -219,7 +219,7 @@ impl ZkSyncState {
             let balance = BigUint::from(MIN_NFT_TOKEN_ID);
             let (mut account, upd) =
                 Account::create_account(NFT_STORAGE_ACCOUNT_ID, *NFT_STORAGE_ACCOUNT_ADDRESS);
-            updates.extend(upd.into_iter());
+            updates.extend(upd);
             account.add_balance(NFT_TOKEN_ID, &BigUint::from(MIN_NFT_TOKEN_ID));
 
             self.insert_account(NFT_STORAGE_ACCOUNT_ID, account.clone());

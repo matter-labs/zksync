@@ -576,8 +576,8 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
-            pack_bits.extend(block_pub_data_bits.into_iter());
-            pack_bits.extend(block_onchain_op_commitment_bits.into_iter());
+            pack_bits.extend(block_pub_data_bits);
+            pack_bits.extend(block_onchain_op_commitment_bits);
 
             hash_block = sha256::sha256(cs.namespace(|| "final hash public"), &pack_bits)?;
 
