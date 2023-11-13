@@ -631,3 +631,29 @@ export interface Toggle2FARequest {
 export interface Toggle2FAResponse {
     success: boolean;
 }
+
+export interface NetworkRequestType {
+    [Transports.WS]: string
+    [Transports.HTTP]: string
+}
+
+export interface ILinks {
+    [Networks.LOCALHOST]: NetworkRequestType
+    [Networks.GOERLI]: NetworkRequestType
+    [Networks.GOERLI_BETA]: NetworkRequestType
+    [Networks.RINKEBY_BETA]: NetworkRequestType
+    [Networks.MAINNET]: NetworkRequestType
+}
+
+export enum Networks {
+    LOCALHOST = 'localhost',
+    GOERLI = 'goerli',
+    GOERLI_BETA = 'goerli-beta',
+    RINKEBY_BETA = 'rinkeby-beta',
+    MAINNET = 'mainnet',
+}
+
+export enum Transports {
+    WS = 'WS',
+    HTTP = 'HTTP',
+}

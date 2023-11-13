@@ -16,7 +16,11 @@ import {
     TxEthSignatureVariant,
     NFTInfo,
     Toggle2FARequest,
-    Toggle2FAResponse
+    Toggle2FAResponse,
+    NetworkRequestType,
+    ILinks,
+    Networks,
+    Transports,
 } from './types';
 import { isTokenETH, sleep, TokenSet } from './utils';
 import {
@@ -30,55 +34,62 @@ import {
 
 import { SyncProvider } from './provider-interface';
 
+export const Links: ILinks = {
+    [Networks.LOCALHOST]: {
+        [Transports.WS]: 'ws://127.0.0.1:3031',
+        [Transports.HTTP]: 'http://127.0.0.1:3030',
+    },
+    [Networks.GOERLI]: {
+        [Transports.WS]: 'wss://goerli-api.zksync.io/jsrpc-ws',
+        [Transports.HTTP]: 'https://goerli-api.zksync.io/jsrpc',
+    },
+    [Networks.GOERLI_BETA]: {
+        [Transports.WS]: 'wss://goerli-beta-api.zksync.dev/jsrpc-ws',
+        [Transports.HTTP]: 'https://goerli-beta-api.zksync.dev/jsrpc',
+    },
+    [Networks.RINKEBY_BETA]: {
+        [Transports.WS]: 'wss://rinkeby-beta-api.zksync.io/jsrpc-ws',
+        [Transports.HTTP]: 'https://rinkeby-beta-api.zksync.io/jsrpc',
+    },
+    [Networks.MAINNET]: {
+        [Transports.WS]: 'wss://api.zksync.io/jsrpc-ws',
+        [Transports.HTTP]: 'https://api.zksync.io/jsrpc',
+    },
+}
+
+export async function getProvider(
+    links: NetworkRequestType,
+    network: Network,
+    transport: 'WS' | 'HTTP' = 'HTTP',
+    pollIntervalMilliSecs?: number,
+): Promise<Provider> {
+    if (transport === Transports.WS) {
+        return await Provider.newWebsocketProvider(links[Transports.WS], network);
+    } else if (transport === Transports.HTTP) {
+        return await Provider.newHttpProvider(links[Transports.HTTP], pollIntervalMilliSecs, network);
+    }
+}
+
 export async function getDefaultProvider(
     network: Network,
     transport: 'WS' | 'HTTP' = 'HTTP',
     pollIntervalMilliSecs?: number
 ): Promise<Provider> {
-    if (transport === 'WS') {
-        console.warn('Websocket support will be removed in future. Use HTTP transport instead.');
-    }
-    if (network === 'localhost') {
-        if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('ws://127.0.0.1:3031', network);
-        } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider('http://127.0.0.1:3030', pollIntervalMilliSecs, network);
-        }
-    } else if (network === 'goerli') {
-        if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://goerli-api.zksync.io/jsrpc-ws', network);
-        } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider('https://goerli-api.zksync.io/jsrpc', pollIntervalMilliSecs, network);
-        }
-    } else if (network === 'goerli-beta') {
-        if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://goerli-beta-api.zksync.dev/jsrpc-ws', network);
-        } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider(
-                'https://goerli-beta-api.zksync.dev/jsrpc',
-                pollIntervalMilliSecs,
-                network
-            );
-        }
-    } else if (network === 'rinkeby-beta') {
-        if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://rinkeby-beta-api.zksync.io/jsrpc-ws', network);
-        } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider(
-                'https://rinkeby-beta-api.zksync.io/jsrpc',
-                pollIntervalMilliSecs,
-                network
-            );
-        }
-    } else if (network === 'mainnet') {
-        if (transport === 'WS') {
-            return await Provider.newWebsocketProvider('wss://api.zksync.io/jsrpc-ws', network);
-        } else if (transport === 'HTTP') {
-            return await Provider.newHttpProvider('https://api.zksync.io/jsrpc', pollIntervalMilliSecs, network);
-        }
-    } else {
-        throw new Error(`Ethereum network ${network} is not supported`);
-    }
+
+    const providerMaps = new Map([
+        [Networks.LOCALHOST, () => getProvider(Links[Networks.LOCALHOST], Networks.LOCALHOST, transport, pollIntervalMilliSecs)],
+        [Networks.GOERLI, () => getProvider(Links[Networks.GOERLI], Networks.GOERLI, transport, pollIntervalMilliSecs)],
+        [Networks.GOERLI_BETA, () => getProvider(Links[Networks.GOERLI_BETA], Networks.GOERLI_BETA, transport, pollIntervalMilliSecs)],
+        [Networks.RINKEBY_BETA, () => getProvider(Links[Networks.RINKEBY_BETA], Networks.RINKEBY_BETA, transport, pollIntervalMilliSecs)],
+        [Networks.MAINNET, () => getProvider(Links[Networks.MAINNET], Networks.MAINNET, transport, pollIntervalMilliSecs)],
+        ['default', () => { throw new Error(`Ethereum network ${network} is not supported`) }]
+    ]);
+
+    const result = Networks[network] || 'default';
+
+    const provider = providerMaps.get(result);
+
+    return await provider();
 }
 
 export class Provider extends SyncProvider {
