@@ -25,7 +25,7 @@
     "hardhat": "^2.8.0",
     "hardhat-contract-sizer": "^2.0.2",
     "hardhat-typechain": "^0.3.3",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "mocha": "^8.2.0",
     "openzeppelin-solidity": "^2.3.0",
     "path": "^0.12.7",
