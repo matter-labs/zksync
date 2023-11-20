@@ -12,7 +12,11 @@ async function performRedeployment() {
 }
 
 export async function run() {
-    await utils.spawn('cargo run --release --bin dummy_prover dummy-prover-instance');
+    const child = utils.background('cargo run --release --bin dummy_prover dummy-prover-instance');
+
+    process.on('SIGINT', () => {
+        child.kill('SIGINT');
+    });
 }
 
 export async function status() {
