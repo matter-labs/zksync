@@ -2435,7 +2435,7 @@ dependencies = [
  "rust-crypto",
  "serde_json",
  "structopt",
- "time 0.1.43",
+ "time 0.3.4",
  "vlog",
  "zksync_circuit",
  "zksync_config",
