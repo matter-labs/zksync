@@ -94,6 +94,11 @@ jobs:
           curl -LO https://github.com/getsops/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64
           mv sops-v3.8.1.linux.amd64 /usr/local/bin/sops
           chmod +x /usr/local/bin/sops
+          curl -LO https://github.com/helmfile/helmfile/releases/download/v0.147.0/helmfile_0.147.0_linux_amd64.tar.gz
+          tar xzvf helmfile_0.147.0_linux_amd64.tar.gz
+          mv helmfile /usr/local/bin/helmfile
+          chmod +x /usr/local/bin/helmfile
+
       -
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
         with:
