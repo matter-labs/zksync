@@ -26,7 +26,7 @@ pub mod error;
 mod pubkey_hash;
 
 /// zkSync network account.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Account {
     /// Hash of the account public key used to authorize operations for this account.
     /// Once account is created (e.g. by `Transfer` or `Deposit` operation), account owner
@@ -49,6 +49,25 @@ pub struct Account {
     /// It is measured to not affect performance much (e.g. each account is never actually accessed concurrently).
     #[serde(skip)]
     circuit_account: Option<Arc<RwLock<CircuitAccount<super::Engine>>>>,
+}
+
+impl Clone for Account {
+    fn clone(&self) -> Self {
+        // Cloning an `Arc` is shallow, but we need a deep copy (since the account may be modified and we don't want copy to be affected).
+        let circuit_account = self
+            .circuit_account
+            .as_ref()
+            .map(|acc| Arc::new(RwLock::new(acc.read().unwrap().clone())));
+
+        Self {
+            pub_key_hash: self.pub_key_hash,
+            address: self.address,
+            balances: self.balances.clone(),
+            nonce: self.nonce,
+            minted_nfts: self.minted_nfts.clone(),
+            circuit_account,
+        }
+    }
 }
 
 impl std::fmt::Debug for Account {
