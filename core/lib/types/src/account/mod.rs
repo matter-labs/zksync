@@ -97,7 +97,14 @@ impl PartialEq for Account {
 impl From<Account> for CircuitAccount<super::Engine> {
     fn from(acc: Account) -> Self {
         if let Some(circuit_account) = acc.circuit_account {
-            return circuit_account.read().unwrap().clone();
+            let mut raw_account = circuit_account.read().unwrap().clone();
+
+            // Given that the following fields are public, they may change externally, so we make sure to set them manually.
+            raw_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
+            raw_account.pub_key_hash = acc.pub_key_hash.as_fr();
+            raw_account.address = eth_address_to_fr(&acc.address);
+
+            return raw_account;
         }
 
         let mut circuit_account = CircuitAccount::default();
