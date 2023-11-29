@@ -1,5 +1,8 @@
 // Built-in deps
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 // External uses
 use num::{BigUint, Zero};
 use serde::{Deserialize, Serialize};
@@ -23,7 +26,7 @@ pub mod error;
 mod pubkey_hash;
 
 /// zkSync network account.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Account {
     /// Hash of the account public key used to authorize operations for this account.
     /// Once account is created (e.g. by `Transfer` or `Deposit` operation), account owner
@@ -37,6 +40,27 @@ pub struct Account {
     /// order to not allow double spend, and the nonce must increment by one after each operation.
     pub nonce: Nonce,
     pub minted_nfts: HashMap<TokenId, NFT>,
+    /// Cached circuit account balance tree, used to efficiently calculate root hash of this account from within
+    /// `AccountTree`. All the changes applied to the account are also applied to the circuit account tree.
+    ///
+    /// Note that this is an intentional kludge. `Arc<RwLock<..>>` is required to both allow interior mutability (to make sure
+    /// that we *always* use the correct fields in the `CircuitAccount` whenever we calculate hash), and at the same time keep the
+    /// structure `Send`/`Sync` (required by `rayon` used in the merkle tree).
+    /// It is measured to not affect performance much (e.g. each account is never actually accessed concurrently).
+    #[serde(skip)]
+    circuit_account: Option<Arc<RwLock<CircuitAccount<super::Engine>>>>,
+}
+
+impl std::fmt::Debug for Account {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Account")
+            .field("pub_key_hash", &self.pub_key_hash)
+            .field("address", &self.address)
+            .field("balances", &self.balances)
+            .field("nonce", &self.nonce)
+            .field("minted_nfts", &self.minted_nfts)
+            .finish()
+    }
 }
 
 impl PartialEq for Account {
@@ -72,6 +96,10 @@ impl PartialEq for Account {
 
 impl From<Account> for CircuitAccount<super::Engine> {
     fn from(acc: Account) -> Self {
+        if let Some(circuit_account) = acc.circuit_account {
+            return circuit_account.read().unwrap().clone();
+        }
+
         let mut circuit_account = CircuitAccount::default();
 
         for (i, b) in acc.balances.iter().map(|(id, b)| {
@@ -100,12 +128,25 @@ impl Default for Account {
             pub_key_hash: PubKeyHash::default(),
             address: Address::zero(),
             minted_nfts: HashMap::new(),
+            circuit_account: Some(Default::default()),
         }
     }
 }
 
 impl GetBits for Account {
     fn get_bits_le(&self) -> Vec<bool> {
+        if let Some(circuit_account) = &self.circuit_account {
+            let mut circuit_account = circuit_account.write().unwrap();
+            // Make sure to manually set all the public fields to ensure that circuit account represents
+            // the actual state of account (in case these were changed extermally).
+            // Balances are private, so we may be sure that the subtree in the account is update
+            circuit_account.nonce = Fr::from_str(&self.nonce.to_string()).unwrap();
+            circuit_account.pub_key_hash = self.pub_key_hash.as_fr();
+            circuit_account.address = eth_address_to_fr(&self.address);
+
+            return circuit_account.get_bits_le();
+        }
+
         CircuitAccount::<super::Engine>::from(self.clone()).get_bits_le()
     }
 }
@@ -155,14 +196,22 @@ impl Account {
 
     /// Overrides the token balance value.
     pub fn set_balance(&mut self, token: TokenId, amount: BigUint) {
-        self.balances.insert(token, amount.into());
+        let amount: BigUintSerdeWrapper = amount.into();
+        self.balances.insert(token, amount.clone());
+        if let Some(circuit_account) = &mut self.circuit_account {
+            let mut circuit_account = circuit_account.write().unwrap();
+            let balance = Balance {
+                value: Fr::from_str(&amount.0.to_string()).unwrap(),
+            };
+            circuit_account.subtree.insert(*token, balance);
+        }
     }
 
     /// Adds the provided amount to the token balance.
     pub fn add_balance(&mut self, token: TokenId, amount: &BigUint) {
         let mut balance = self.balances.remove(&token).unwrap_or_default();
         balance.0 += amount;
-        self.balances.insert(token, balance);
+        self.set_balance(token, balance.0);
     }
 
     /// Subtracts the provided amount from the token balance.
@@ -173,7 +222,7 @@ impl Account {
     pub fn sub_balance(&mut self, token: TokenId, amount: &BigUint) {
         let mut balance = self.balances.remove(&token).unwrap_or_default();
         balance.0 -= amount;
-        self.balances.insert(token, balance);
+        self.set_balance(token, balance.0);
     }
 
     /// Given the list of updates to apply, changes the account state.

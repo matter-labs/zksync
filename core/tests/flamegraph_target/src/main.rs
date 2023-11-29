@@ -1,8 +1,8 @@
 use std::str::FromStr;
 use structopt::StructOpt;
 
-mod tree_target;
 mod account_tree_target;
+mod tree_target;
 
 /// Target to analyze.
 #[derive(Debug)]
@@ -10,7 +10,7 @@ enum Target {
     /// Merkle tree (raw).
     Tree,
     /// Account tree.
-    AccountTree
+    AccountTree,
 }
 
 impl FromStr for Target {

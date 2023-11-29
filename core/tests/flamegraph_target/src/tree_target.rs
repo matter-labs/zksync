@@ -17,13 +17,11 @@ const N_CYCLES: usize = 1_000;
 const VALUES_PER_CYCLE: usize = 1_000;
 
 macro_rules! measured {
-    ($descr: expr, $tree: expr, $call: tt) => {
-        {
-            let start = Instant::now();
-            $call(&mut $tree);
-            println!("{}: took {:?}", $descr, start.elapsed());
-        }
-    };
+    ($descr: expr, $tree: expr, $call: tt) => {{
+        let start = Instant::now();
+        $call(&mut $tree);
+        println!("{}: took {:?}", $descr, start.elapsed());
+    }};
 }
 
 /// An entry point for analysis.
