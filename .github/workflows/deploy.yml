@@ -68,9 +68,6 @@ jobs:
       - id: "auth"
         run: |
           echo "docker_token=$(gcloud auth print-access-token)" >> $GITHUB_OUTPUT
-      - id: "some"
-        run: |
-          echo ${{ steps.auth.outputs.docker_token }}
   deploy:
     name: Server
     runs-on: ["matterlabs-deployer-${{ inputs.cluster }}"]
