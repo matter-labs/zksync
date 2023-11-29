@@ -59,12 +59,24 @@ defaults:
 concurrency: deploy-app-${{ inputs.environment }}
 
 jobs:
+  login-to-gcr:
+    runs-on: ["matterlabs-deployer-testnet"]
+    name: "Login to GCR"
+    outputs:
+      docker_token: ${{ steps.auth.outputs.docker_token }}
+    steps:
+      - id: "auth"
+        run: |
+          echo "docker_token=$(gcloud auth print-access-token)" >> $GITHUB_OUTPUT
   deploy:
     name: Server
     runs-on: ["matterlabs-deployer-${{ inputs.cluster }}"]
+    needs: login-to-gcr
     container:
-      image: dysnix/kubectl:v1.26-gcloud
-      options: --user root
+      image: gcr.io/matterlabs-infra/docker-k8s-linter:latest
+      credentials:
+        username: oauth2accesstoken
+        password: ${{ needs.login-to-gcr.outputs.docker_token }}
       volumes:
         - /var/run/secrets/tokens:/var/run/secrets/tokens
     env:
@@ -72,13 +84,16 @@ jobs:
       DEPLOY_APPS_PROD: -l name=${{ inputs.server-release }} -l name=${{ inputs.prover-release }} -l name=${{ inputs.server-witness-release }}
       IMAGE_TAG: ${{ inputs.image-tag }}
       KUBE_CONTEXT: matterlabs-zksync-${{ inputs.cluster }}
-      KUBE_TOKENPATH: /var/run/secrets/tokens/gha-deployer-${{ inputs.cluster }}
+      KUBE_TOKENPATH: /var/run/secrets/tokens/matterlabs-deployer-${{ inputs.cluster }}
     steps:
       -
-        name: reown helm home
+        name: Install additional deps
         run: |
-          chown -R root /dysnix/kubectl/.cache/helm
-          chown -R root /dysnix/kubectl/.local/share/helm
+          helm plugin install https://github.com/databus23/helm-diff
+          helm plugin install https://github.com/jkroepke/helm-secrets --version v3.12.0
+          curl -LO https://github.com/getsops/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64
+          mv sops-v3.8.1.linux.amd64 /usr/local/bin/sops
+          chmod +x /usr/local/bin/sops
       -
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
         with:
