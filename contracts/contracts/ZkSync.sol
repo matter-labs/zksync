@@ -80,7 +80,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Notification that upgrade preparation status is activated
     /// @dev Can be external because Proxy contract intercepts illegal calls of this function
     function upgradePreparationStarted() external override {
-        require(block.timestamp >= upgradeStartTimestamp.add(approvedUpgradeNoticePeriod));
+        require(block.timestamp >= upgradeStartTimestamp + approvedUpgradeNoticePeriod);
 
         upgradePreparationActive = true;
         upgradePreparationActivationTime = block.timestamp;
@@ -190,14 +190,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint128 _amount,
         uint128 _maxAmount
     ) external returns (uint128 withdrawnAmount) {
-        require(msg.sender == address(this), "5"); // can be called only from this contract as one "external" call (to revert all this function state changes if it is needed)
+        require(msg.sender == address(this), "Only callable from contract"); // can be called only from this contract as one "external" call (to revert all this function state changes if it is needed)
 
         uint256 balanceBefore = _token.balanceOf(address(this));
         _token.transfer(_to, _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
-        uint256 balanceDiff = balanceBefore.sub(balanceAfter);
-        require(balanceDiff > 0, "c1"); // transfer is considered successful only if the balance of the contract decreased after transfer
-        require(balanceDiff <= _maxAmount, "7"); // rollup balance difference (before and after transfer) is bigger than `_maxAmount`
+        uint256 balanceDiff = balanceBefore - balanceAfter;
+        require(balanceDiff > 0, "Transfer failed, balance unchanged"); // transfer is considered successful only if the balance of the contract decreased after transfer
+        require(balanceDiff <= _maxAmount, "Transfer exceeds max amount"); // rollup balance difference (before and after transfer) is bigger than `_maxAmount`
 
         // It is safe to convert `balanceDiff` to `uint128` without additional checks, because `balanceDiff <= _maxAmount`
         return uint128(balanceDiff);
@@ -219,7 +219,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _zkSyncAddress The receiver Layer 2 address
     function depositETH(address _zkSyncAddress) external payable {
         require(_zkSyncAddress != SPECIAL_ACCOUNT_ADDRESS, "P");
-        require(msg.value > 0, "M"); // Zero-value deposits are forbidden by zkSync rollup logic
+        require(msg.value > 0, "Deposit amount must be greater than zero"); // Zero-value deposits are forbidden by zkSync rollup logic
         requireActive();
         registerDeposit(0, SafeCast.toUint128(msg.value), _zkSyncAddress);
     }
@@ -228,11 +228,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _token Token address
     /// @param _amount Token amount
     /// @param _zkSyncAddress Receiver Layer 2 address
-    function depositERC20(
-        IERC20 _token,
-        uint104 _amount,
-        address _zkSyncAddress
-    ) external nonReentrant {
+    function depositERC20(IERC20 _token, uint104 _amount, address _zkSyncAddress) external nonReentrant {
         require(_zkSyncAddress != SPECIAL_ACCOUNT_ADDRESS, "P");
         requireActive();
 
@@ -243,7 +239,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         uint256 balanceBefore = _token.balanceOf(address(this));
         _token.transferFrom(msg.sender, address(this), _amount);
         uint256 balanceAfter = _token.balanceOf(address(this));
-        uint128 depositAmount = SafeCast.toUint128(balanceAfter.sub(balanceBefore));
+        uint128 depositAmount = SafeCast.toUint128(balanceAfter - balanceBefore);
         require(depositAmount > 0 && depositAmount <= MAX_DEPOSIT_AMOUNT, "C");
 
         registerDeposit(tokenId, depositAmount, _zkSyncAddress);
@@ -266,11 +262,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _amount Amount to withdraw to request.
     ///         NOTE: We will call ERC20.transfer(.., _amount), but if according to internal logic of ERC20 token zkSync contract
     ///         balance will be decreased by value more then _amount we will try to subtract this value from user pending balance
-    function withdrawPendingBalance(
-        address payable _owner,
-        address _token,
-        uint128 _amount
-    ) external nonReentrant {
+    function withdrawPendingBalance(address payable _owner, address _token, uint128 _amount) external nonReentrant {
         uint16 tokenId = 0;
         if (_token != address(0)) {
             tokenId = governance.validateTokenAddress(_token);
@@ -282,7 +274,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         require(amount > 0, "f1"); // Nothing to withdraw
 
         if (tokenId == 0) {
-            (bool success, ) = _owner.call{value: amount}("");
+            (bool success, ) = _owner.call{ value: amount }("");
             require(success, "d"); // ETH withdraw failed
         } else {
             // We will allow withdrawals of `value` such that:
@@ -377,17 +369,16 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     /// @dev Process one block commit using previous block StoredBlockInfo,
     /// @dev returns new block StoredBlockInfo
-    function commitOneBlock(StoredBlockInfo memory _previousBlock, CommitBlockInfo calldata _newBlock)
-        internal
-        view
-        returns (StoredBlockInfo memory storedNewBlock)
-    {
+    function commitOneBlock(
+        StoredBlockInfo memory _previousBlock,
+        CommitBlockInfo calldata _newBlock
+    ) internal view returns (StoredBlockInfo memory storedNewBlock) {
         require(_newBlock.blockNumber == _previousBlock.blockNumber + 1, "f"); // only commit next block
 
         // Check timestamp of the new block
         {
             require(_newBlock.timestamp >= _previousBlock.timestamp, "g"); // Block should be after previous block
-            bool timestampNotTooSmall = block.timestamp.sub(COMMIT_TIMESTAMP_NOT_OLDER) <= _newBlock.timestamp;
+            bool timestampNotTooSmall = block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER <= _newBlock.timestamp;
             bool timestampNotTooBig = _newBlock.timestamp <= block.timestamp.add(COMMIT_TIMESTAMP_APPROXIMATION_DELTA);
             require(timestampNotTooSmall && timestampNotTooBig, "h"); // New block timestamp is not valid
         }
@@ -416,10 +407,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Commit block
     /// @notice 1. Checks onchain operations, timestamp.
     /// @notice 2. Store block commitments
-    function commitBlocks(StoredBlockInfo memory _lastCommittedBlockData, CommitBlockInfo[] calldata _newBlocksData)
-        external
-        nonReentrant
-    {
+    function commitBlocks(
+        StoredBlockInfo memory _lastCommittedBlockData,
+        CommitBlockInfo[] calldata _newBlocksData
+    ) external nonReentrant {
         requireActive();
         governance.requireActiveValidator(msg.sender);
         // Check that we commit blocks after last committed block
@@ -515,7 +506,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
             pendingOnchainOpsHash = Utils.concatHash(pendingOnchainOpsHash, pubData);
         }
-        require(pendingOnchainOpsHash == _blockExecuteData.storedBlock.pendingOnchainOperationsHash, "m"); // incorrect onchain ops executed
+        require(
+            pendingOnchainOpsHash == _blockExecuteData.storedBlock.pendingOnchainOperationsHash,
+            "Incorrect onchain ops executed"
+        ); // incorrect onchain ops executed
     }
 
     /// @notice Execute blocks, completing priority operations and processing withdrawals.
@@ -666,11 +660,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _tokenId Token by id
     /// @param _amount Token amount
     /// @param _owner Receiver
-    function registerDeposit(
-        uint16 _tokenId,
-        uint128 _amount,
-        address _owner
-    ) internal {
+    function registerDeposit(uint16 _tokenId, uint128 _amount, address _owner) internal {
         // Priority Queue request
         Operations.Deposit memory op = Operations.Deposit({
             accountId: 0, // unknown at this point
@@ -767,11 +757,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice Checks that change operation is correct
-    function verifyChangePubkey(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
-        internal
-        pure
-        returns (bool)
-    {
+    function verifyChangePubkey(
+        bytes calldata _ethWitness,
+        Operations.ChangePubKey memory _changePk
+    ) internal pure returns (bool) {
         Operations.ChangePubkeyType changePkType = Operations.ChangePubkeyType(uint8(_ethWitness[0]));
         if (changePkType == Operations.ChangePubkeyType.ECRECOVER) {
             return verifyChangePubkeyECRECOVER(_ethWitness, _changePk);
@@ -791,11 +780,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Checks that signature is valid for pubkey change message
     /// @param _ethWitness Signature (65 bytes)
     /// @param _changePk Parsed change pubkey operation
-    function verifyChangePubkeyECRECOVER(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
-        internal
-        pure
-        returns (bool)
-    {
+    function verifyChangePubkeyECRECOVER(
+        bytes calldata _ethWitness,
+        Operations.ChangePubKey memory _changePk
+    ) internal pure returns (bool) {
         (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
         bytes32 messageHash = keccak256(
             abi.encodePacked(
@@ -813,11 +801,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Checks that signature is valid for pubkey change EIP712 message
     /// @param _ethWitness Signature (65 bytes)
     /// @param _changePk Parsed change pubkey operation
-    function verifyChangePubkeyEIP712(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
-        internal
-        pure
-        returns (bool)
-    {
+    function verifyChangePubkeyEIP712(
+        bytes calldata _ethWitness,
+        Operations.ChangePubKey memory _changePk
+    ) internal pure returns (bool) {
         (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
         bytes32 eip712DomainSeparator = keccak256(
             abi.encode(EIP712_DOMAIN_TYPEHASH, keccak256(bytes(name)), keccak256(bytes(version)), Utils.getChainId())
@@ -834,11 +821,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @param _ethWitness Signature (65 bytes) + 32 bytes of the arbitrary signed data
     /// @notice additional 32 bytes can be used to sign batches and ChangePubKey with one signature
     /// @param _changePk Parsed change pubkey operation
-    function verifyChangePubkeyECRECOVERV2(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
-        internal
-        pure
-        returns (bool)
-    {
+    function verifyChangePubkeyECRECOVERV2(
+        bytes calldata _ethWitness,
+        Operations.ChangePubKey memory _changePk
+    ) internal pure returns (bool) {
         (uint256 offset, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
         (, bytes32 additionalData) = Bytes.readBytes32(_ethWitness, offset);
         bytes32 messageHash = keccak256(
@@ -857,11 +843,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Checks that signature is valid for pubkey change message, old version differs by form of the signed message.
     /// @param _ethWitness Signature (65 bytes)
     /// @param _changePk Parsed change pubkey operation
-    function verifyChangePubkeyOldECRECOVER(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
-        internal
-        pure
-        returns (bool)
-    {
+    function verifyChangePubkeyOldECRECOVER(
+        bytes calldata _ethWitness,
+        Operations.ChangePubKey memory _changePk
+    ) internal pure returns (bool) {
         (, bytes memory signature) = Bytes.read(_ethWitness, 1, 65); // offset is 1 because we skip type of ChangePubkey
         bytes32 messageHash = keccak256(
             abi.encodePacked(
@@ -885,11 +870,10 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     /// @notice Checks that signature is valid for pubkey change message
     /// @param _ethWitness Create2 deployer address, saltArg, codeHash
     /// @param _changePk Parsed change pubkey operation
-    function verifyChangePubkeyCREATE2(bytes calldata _ethWitness, Operations.ChangePubKey memory _changePk)
-        internal
-        pure
-        returns (bool)
-    {
+    function verifyChangePubkeyCREATE2(
+        bytes calldata _ethWitness,
+        Operations.ChangePubKey memory _changePk
+    ) internal pure returns (bool) {
         address creatorAddress;
         bytes32 saltArg; // salt arg is additional bytes that are encoded in the CREATE2 salt
         bytes32 codeHash;
@@ -996,7 +980,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
 
     function increaseBalanceToWithdraw(bytes22 _packedBalanceKey, uint128 _amount) internal {
         uint128 balance = pendingBalances[_packedBalanceKey].balanceToWithdraw;
-        pendingBalances[_packedBalanceKey] = PendingBalance(balance.add(_amount), FILLED_GAS_RESERVE_VALUE);
+        pendingBalances[packedBalanceKey] = PendingBalance(balance + amount, FILLED_GAS_RESERVE_VALUE);
     }
 
     /// @notice Delegates the call to the additional part of the main contract.
