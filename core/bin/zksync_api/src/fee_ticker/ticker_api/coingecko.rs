@@ -15,16 +15,32 @@ use zksync_utils::{remove_prefix, UnsignedRatioSerializeAsDecimal};
 #[derive(Debug, Clone)]
 pub struct CoinGeckoAPI {
     base_url: Url,
+    key: Option<String>,
     client: reqwest::Client,
     token_ids: HashMap<Address, String>,
 }
 
 impl CoinGeckoAPI {
-    pub async fn new(client: reqwest::Client, base_url: Url) -> anyhow::Result<Self> {
-        let token_list_url = base_url
-            .join("api/v3/coins/list?include_platform=true")
-            .expect("failed to join URL path");
-
+    pub async fn new(
+        client: reqwest::Client,
+        base_url: Url,
+        key: Option<String>,
+    ) -> anyhow::Result<Self> {
+        let token_list_url = if let Some(key) = key.clone() {
+            base_url
+                .join(
+                    format!(
+                        "api/v3/coins/list?include_platform=true&x_cg_api_key={}",
+                        key
+                    )
+                    .as_str(),
+                )
+                .expect("failed to join URL path")
+        } else {
+            base_url
+                .join("api/v3/coins/list?include_platform")
+                .expect("failed to join URL path")
+        };
         let token_list = reqwest::get(token_list_url)
             .await
             .map_err(|err| anyhow::format_err!("CoinGecko API request failed: {}", err))?
@@ -48,6 +64,7 @@ impl CoinGeckoAPI {
 
         Ok(Self {
             base_url,
+            key,
             client,
             token_ids,
         })
@@ -64,21 +81,28 @@ impl TokenPriceAPI for CoinGeckoAPI {
                 token.symbol, token.address
             ))
         })?;
-
-        let market_chart_url = self
-            .base_url
-            .join(format!("api/v3/coins/{}/market_chart", token_id).as_str())
-            .expect("failed to join URL path");
+        let market_chart_url = if let Some(key) = &self.key {
+            self.base_url
+                .join(
+                    format!(
+                        "api/v3/coins/{}/market_chart?x_cg_api_key={}",
+                        token_id, key
+                    )
+                    .as_str(),
+                )
+                .expect("failed to join URL path")
+        } else {
+            self.base_url
+                .join(format!("api/v3/coins/{}/market_chart", token_id,).as_str())
+                .expect("failed to join URL path")
+        };
 
         let market_chart = self
             .client
             .get(market_chart_url)
             .timeout(REQUEST_TIMEOUT)
-            .query(&[
-                ("vs_currency", "usd"),
-                ("days", "1"),
-                ("interval", "hourly"),
-            ])
+            // Tips from coingecko: you can retrieve hourly interval data automatically, as long as the 'days' value is between 2 to 90 days; you don't have to specify the interval parameter which is optional.
+            .query(&[("vs_currency", "usd"), ("days", "2")])
             .send()
             .await
             .map_err(|err| PriceError::api_error(format!("CoinGecko API request failed: {}", err)))?
@@ -162,7 +186,7 @@ mod tests {
     async fn test_coingecko_api() {
         let ticker_url = parse_env("FEE_TICKER_COINGECKO_BASE_URL");
         let client = reqwest::Client::new();
-        let api = CoinGeckoAPI::new(client, ticker_url).await.unwrap();
+        let api = CoinGeckoAPI::new(client, ticker_url, None).await.unwrap();
         let token = Token::new(TokenId(0), Default::default(), "ETH", 18, TokenKind::ERC20);
         api.get_price(&token)
             .await
