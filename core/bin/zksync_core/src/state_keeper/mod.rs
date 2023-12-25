@@ -12,6 +12,7 @@ use tokio::time;
 // Workspace uses
 use zksync_mempool::{GetBlockRequest, MempoolBlocksRequest, ProposedBlock};
 use zksync_state::state::{OpSuccess, ZkSyncState};
+use zksync_types::tx::TxHash;
 use zksync_types::{
     block::{
         BlockMetadata, ExecutedOperations, ExecutedPriorityOp, ExecutedTx, IncompleteBlock,
@@ -316,12 +317,21 @@ impl ZkSyncStateKeeper {
         // Keeping in mind that we regularly clean the memmpool from executing txs, it's impossible when
         // tons of rejected txs will be returned from the database.
 
-        let executed_txs = self
+        let mut executed_txs: Vec<TxHash> = self
             .pending_block
             .success_operations
             .iter()
             .filter_map(|op| op.get_executed_tx().map(|tx| tx.signed_tx.hash()))
             .collect();
+
+        executed_txs.append(
+            &mut self
+                .pending_block
+                .failed_txs
+                .iter()
+                .map(|op| op.signed_tx.tx.hash())
+                .collect(),
+        );
 
         let mempool_req = MempoolBlocksRequest::GetBlock(GetBlockRequest {
             last_priority_op_number: self.pending_block.unprocessed_priority_op_current,
@@ -375,6 +385,14 @@ impl ZkSyncStateKeeper {
     }
 
     async fn execute_proposed_block(&mut self, proposed_block: ProposedBlock) {
+        if !proposed_block.is_empty() {
+            vlog::info!(
+                "Processing new proposed block: {} priority ops, {} l2 txs",
+                proposed_block.priority_ops.len(),
+                proposed_block.txs.len()
+            );
+        }
+
         let start = Instant::now();
         let mut executed_ops = Vec::new();
 
@@ -754,9 +772,7 @@ impl ZkSyncStateKeeper {
             &self.pending_block.collected_fees,
             self.config.fee_account_id,
         );
-        self.pending_block
-            .account_updates
-            .extend(fee_updates.into_iter());
+        self.pending_block.account_updates.extend(fee_updates);
 
         // TODO (ZKS-821): Currently the logic of this procedure is obscure and error-prone.
         // I've met multiple bugs trying to adapt it because it works at the same time with the "old"

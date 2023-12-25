@@ -453,7 +453,7 @@ impl TreeState {
             .address;
 
         let fee_updates = self.state.collect_fee(&fees, ops_block.fee_account);
-        accounts_updated.extend(fee_updates.into_iter());
+        accounts_updated.extend(fee_updates);
 
         self.last_fee_account_address = fee_account_address;
 
@@ -725,6 +725,7 @@ mod test {
             Default::default(),
             None,
             None,
+            None,
         );
         let op5 = ZkSyncOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
             tx: tx5,
@@ -940,6 +941,7 @@ mod test {
             BigUint::from(1u32),
             Nonce(2),
             Default::default(),
+            None,
             None,
             None,
         );

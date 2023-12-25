@@ -16,7 +16,7 @@ use crate::storage_interactor::StorageInteractor;
 use zksync_types::{tokens::get_genesis_token_list, TokenId};
 
 // How many blocks we will process at once.
-pub const ETH_BLOCKS_STEP: u64 = 10_000;
+pub const ETH_BLOCKS_STEP: u64 = 100;
 pub const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
 pub async fn add_tokens_to_storage(interactor: &mut StorageInteractor<'_>, eth_network: &str) {

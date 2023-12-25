@@ -4,7 +4,7 @@ use std::time::Instant;
 // Workspace imports
 use zksync_types::BlockNumber;
 // Local imports
-use super::records::AccountTreeCache;
+use super::records::AccountTreeCacheJSON;
 use crate::{QueryResult, StorageProcessor};
 
 /// Tree cache schema contains methods to store/load Merkle tree cache.
@@ -74,9 +74,9 @@ impl<'a, 'c> TreeCacheSchemaJSON<'a, 'c> {
     ) -> QueryResult<Option<(BlockNumber, serde_json::Value)>> {
         let start = Instant::now();
         let account_tree_cache = sqlx::query_as!(
-            AccountTreeCache,
+            AccountTreeCacheJSON,
             "
-            SELECT * FROM account_tree_cache
+            SELECT block, tree_cache FROM account_tree_cache
             WHERE tree_cache IS NOT NULL
             ORDER BY block DESC
             LIMIT 1
@@ -115,9 +115,9 @@ impl<'a, 'c> TreeCacheSchemaJSON<'a, 'c> {
     ) -> QueryResult<Option<serde_json::Value>> {
         let start = Instant::now();
         let account_tree_cache = sqlx::query_as!(
-            AccountTreeCache,
+            AccountTreeCacheJSON,
             "
-            SELECT * FROM account_tree_cache
+            SELECT block, tree_cache FROM account_tree_cache
             WHERE block = $1 AND tree_cache IS NOT NULL
             ",
             *block as i64

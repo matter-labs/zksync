@@ -19,6 +19,7 @@ vlog = { path = "../../lib/vlog", version = "1.0" }
 thiserror = "1.0"
 metrics = "0.17"
 serde_json = "1.0"
+chrono = "0.4"
 
 
 [dev-dependencies]

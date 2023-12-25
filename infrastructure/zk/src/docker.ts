@@ -43,6 +43,8 @@ async function _build(image: string) {
     if (image == 'server' || image == 'prover') {
         await contract.build();
     }
+    await utils.spawn(`CARGO_HOME=./cargo cargo fetch`);
+
     const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
     const latestImage = `-t matterlabs/${image}:latest`;
     const taggedImage = ['nginx', 'server', 'prover'].includes(image) ? `-t matterlabs/${image}:${imageTag}` : '';
@@ -54,6 +56,10 @@ async function _push(image: string) {
     if (['nginx', 'server', 'prover', 'event-listener'].includes(image)) {
         const { stdout: imageTag } = await utils.exec('git rev-parse --short HEAD');
         await utils.spawn(`docker push matterlabs/${image}:${imageTag}`);
+        await utils.spawn(
+            `docker tag matterlabs/${image}:${imageTag} us-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${imageTag}`
+        );
+        await utils.spawn(`docker push us-docker.pkg.dev/matterlabs-infra/matterlabs-docker/${image}:${imageTag}`);
     }
 }
 

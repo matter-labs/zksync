@@ -240,7 +240,7 @@ impl ZkSyncState {
 
         let mut to_account = {
             let (acc, upd) = Account::create_account(op.to, op.tx.to);
-            updates.extend(upd.into_iter());
+            updates.extend(upd);
             acc
         };
 

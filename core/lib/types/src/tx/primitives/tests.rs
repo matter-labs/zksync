@@ -45,6 +45,7 @@ fn get_change_pub_key() -> ChangePubKey {
         Default::default(),
         None,
         None,
+        None,
     )
 }
 

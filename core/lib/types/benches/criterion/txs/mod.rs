@@ -115,6 +115,7 @@ impl TxBenchSetup {
             Default::default(),
             None,
             None,
+            None,
         );
 
         tx.eth_auth_data = {

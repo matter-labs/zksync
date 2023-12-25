@@ -36,7 +36,7 @@ futures = "0.3"
 num = { version = "0.3.1", features = ["serde"] }
 ctrlc = { version = "3.1", features = ["termination"] }
 anyhow = "1.0"
-async-trait = "0.1.31"
+async-trait = "0.1"
 
 [dev-dependencies]
 chrono = { version = "0.4", features = ["serde"] }

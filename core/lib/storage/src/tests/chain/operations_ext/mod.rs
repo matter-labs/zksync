@@ -16,13 +16,9 @@ use zksync_types::{
 // Local imports
 use self::setup::TransactionsHistoryTestSetup;
 use crate::{
-    chain::block::BlockSchema,
     chain::operations::OperationsSchema,
     chain::operations_ext::SearchDirection,
-    test_data::{
-        dummy_ethereum_tx_hash, gen_sample_block, gen_unique_aggregated_operation,
-        BLOCK_SIZE_CHUNKS,
-    },
+    test_data::{dummy_ethereum_tx_hash, gen_unique_aggregated_operation, BLOCK_SIZE_CHUNKS},
     tests::{db_test, ACCOUNT_MUTEX},
     tokens::StoreTokenError,
     QueryResult, StorageProcessor,
@@ -95,8 +91,9 @@ pub async fn commit_schema_data(
         storage
             .chain()
             .block_schema()
-            .save_block_transactions(block.block_number, block.block_transactions.clone())
-            .await?;
+            .save_full_block(block.clone())
+            .await
+            .unwrap();
     }
 
     Ok(())
@@ -130,13 +127,6 @@ pub async fn commit_block(
 ) -> QueryResult<()> {
     // Required since we use `EthereumSchema` in this test.
     storage.ethereum_schema().initialize_eth_data().await?;
-    BlockSchema(storage)
-        .save_full_block(gen_sample_block(
-            block_number,
-            BLOCK_SIZE_CHUNKS,
-            Default::default(),
-        ))
-        .await?;
     OperationsSchema(storage)
         .store_aggregated_action(gen_unique_aggregated_operation(
             block_number,
@@ -279,7 +269,7 @@ async fn get_account_transactions_history_from(
     setup.add_block(1);
     setup.add_block(2);
 
-    let block_size = setup.blocks[0].block_transactions.len() as u64;
+    let block_size = setup.blocks[1].block_transactions.len() as u64;
 
     let txs_from = 10; // Amount of transactions related to "from" account.
     let txs_to = 7;
@@ -1029,15 +1019,6 @@ async fn tx_data_for_web3(mut storage: StorageProcessor<'_>) -> QueryResult<()> 
 
     setup.add_block(1);
     commit_schema_data(&mut storage, &setup).await?;
-    storage
-        .chain()
-        .block_schema()
-        .save_full_block(gen_sample_block(
-            BlockNumber(1),
-            BLOCK_SIZE_CHUNKS,
-            Default::default(),
-        ))
-        .await?;
 
     // Test data for L1 op.
     let eth_hash = match setup.blocks[0].block_transactions[0].clone() {
@@ -1194,7 +1175,7 @@ async fn test_getting_swap_for_acc(mut storage: StorageProcessor<'_>) -> QueryRe
         .await?;
     commit_schema_data(&mut storage, &setup).await?;
 
-    let addresses_to_check = vec![
+    let addresses_to_check = [
         op.tx.submitter_address,
         setup.from_zksync_account.address,
         setup.to_zksync_account.address,

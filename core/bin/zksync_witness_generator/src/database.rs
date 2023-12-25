@@ -17,7 +17,7 @@ use zksync_types::{
 // Local uses
 use crate::DatabaseInterface;
 
-const NUMBER_OF_STORED_ACCOUNT_TREE_CACHE: u32 = 300;
+const NUMBER_OF_STORED_ACCOUNT_TREE_CACHE: u32 = 400;
 
 /// The actual database wrapper.
 /// This structure uses `StorageProcessor` to interact with an existing database.
@@ -262,11 +262,13 @@ impl DatabaseInterface for Database {
             .store_account_tree_cache(block, tree_cache)
             .await?;
 
-        connection
-            .chain()
-            .tree_cache_schema_bincode()
-            .remove_old_account_tree_cache(block - NUMBER_OF_STORED_ACCOUNT_TREE_CACHE)
-            .await?;
+        if block.0 > NUMBER_OF_STORED_ACCOUNT_TREE_CACHE {
+            connection
+                .chain()
+                .tree_cache_schema_bincode()
+                .remove_old_account_tree_cache(block - NUMBER_OF_STORED_ACCOUNT_TREE_CACHE)
+                .await?;
+        }
 
         Ok(())
     }

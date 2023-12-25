@@ -35,6 +35,7 @@
 //!
 //! [`Block`]: ./block/struct.Block.html
 //! [`Account`]: ./account/struct.Account.html
+#![allow(clippy::derive_partial_eq_without_eq)]
 
 pub mod account;
 pub mod aggregated_operations;
@@ -57,6 +58,7 @@ mod utils;
 
 #[cfg(test)]
 mod tests;
+pub mod withdrawals;
 
 pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
@@ -73,6 +75,8 @@ pub use self::tokens::{
 pub use self::tx::{
     ForcedExit, MintNFT, Order, SignedZkSyncTx, Swap, Transfer, Withdraw, WithdrawNFT, ZkSyncTx,
 };
+
+pub use self::tx::eip712_signature;
 
 #[doc(hidden)]
 pub use self::{operations::CloseOp, tx::Close};

@@ -28,10 +28,10 @@ impl<'a, 'c> TreeCacheSchemaBincode<'a, 'c> {
 
         sqlx::query!(
             "
-            INSERT INTO account_tree_cache (block, tree_cache_binary)
+            INSERT INTO account_tree_cache_new (block, tree_cache_binary)
             VALUES ($1, $2)
             ON CONFLICT (block)
-            DO UPDATE SET tree_cache_binary = $2
+            DO NOTHING
             ",
             *block as i64,
             tree_cache,
@@ -54,7 +54,13 @@ impl<'a, 'c> TreeCacheSchemaBincode<'a, 'c> {
         let start = Instant::now();
 
         let last_block_with_cache = sqlx::query!(
-            "SELECT MAX(block) FROM account_tree_cache WHERE tree_cache_binary IS NOT NULL"
+            r#"
+                SELECT MAX(block) FROM (
+                    SELECT MAX(block) as block FROM account_tree_cache WHERE tree_cache_binary IS NOT NULL
+                    UNION ALL
+                    SELECT MAX(block) as block FROM account_tree_cache_new 
+                ) AS max_block
+            "#
         )
         .fetch_one(self.0.conn())
         .await?
@@ -72,29 +78,23 @@ impl<'a, 'c> TreeCacheSchemaBincode<'a, 'c> {
     /// Returns the block number and associated cache otherwise.
     pub async fn get_account_tree_cache(&mut self) -> QueryResult<Option<(BlockNumber, Vec<u8>)>> {
         let start = Instant::now();
-        let account_tree_cache = sqlx::query_as!(
-            AccountTreeCache,
-            "
-            SELECT * FROM account_tree_cache
-            WHERE tree_cache_binary IS NOT NULL
-            ORDER BY block DESC
-            LIMIT 1
-            ",
-        )
-        .fetch_optional(self.0.conn())
-        .await?;
 
+        let last_block = self.get_last_block_with_account_tree_cache().await?;
+        let account_tree_cache = if let Some(last_block) = last_block {
+            Some((
+                last_block,
+                self.get_account_tree_cache_block(last_block).await?.expect(
+                    "Must be 'some' because we checked that there is a cache for this block",
+                ),
+            ))
+        } else {
+            None
+        };
         metrics::histogram!(
             "sql.chain.tree_cache.bincode.get_account_tree_cache",
             start.elapsed()
         );
-        Ok(account_tree_cache.map(|w| {
-            (
-                BlockNumber(w.block as u32),
-                w.tree_cache_binary
-                    .expect("Must be 'some' because of condition in query"),
-            )
-        }))
+        Ok(account_tree_cache)
     }
 
     /// Gets stored account tree cache for a certain block.
@@ -107,7 +107,25 @@ impl<'a, 'c> TreeCacheSchemaBincode<'a, 'c> {
         let account_tree_cache = sqlx::query_as!(
             AccountTreeCache,
             "
-            SELECT * FROM account_tree_cache
+            SELECT * FROM account_tree_cache_new
+            WHERE block = $1
+            ",
+            *block as i64
+        )
+        .fetch_optional(self.0.conn())
+        .await?;
+        if let Some(account_tree_cache) = account_tree_cache {
+            return Ok(Some(
+                account_tree_cache
+                    .tree_cache_binary
+                    .expect("Must be 'some' because of condition in query"),
+            ));
+        }
+
+        let account_tree_cache = sqlx::query_as!(
+            AccountTreeCache,
+            "
+            SELECT block, tree_cache_binary FROM account_tree_cache
             WHERE block = $1 AND tree_cache_binary IS NOT NULL
             ",
             *block as i64
@@ -132,7 +150,7 @@ impl<'a, 'c> TreeCacheSchemaBincode<'a, 'c> {
     ) -> QueryResult<()> {
         let start = Instant::now();
         sqlx::query!(
-            "DELETE FROM account_tree_cache WHERE block > $1",
+            "DELETE FROM account_tree_cache_new WHERE block > $1",
             *last_block as i64
         )
         .execute(self.0.conn())
@@ -151,12 +169,29 @@ impl<'a, 'c> TreeCacheSchemaBincode<'a, 'c> {
         last_block: BlockNumber,
     ) -> QueryResult<()> {
         let start = Instant::now();
-        sqlx::query!(
-            "DELETE FROM account_tree_cache WHERE block < $1",
-            *last_block as i64
-        )
-        .execute(self.0.conn())
-        .await?;
+
+        loop {
+            let res = sqlx::query!(
+                "DELETE 
+                FROM account_tree_cache_new
+                WHERE block < $1
+                AND ctid IN
+                (
+                    SELECT ctid
+                    FROM account_tree_cache_new
+                    WHERE block < $1
+                    LIMIT 2
+                )
+              returning true 
+            ",
+                *last_block as i64
+            )
+            .fetch_optional(self.0.conn())
+            .await?;
+            if res.is_none() {
+                break;
+            }
+        }
 
         metrics::histogram!(
             "sql.chain.tree_cache.bincode.remove_old_account_tree_cache",

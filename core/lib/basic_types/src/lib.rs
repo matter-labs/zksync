@@ -19,6 +19,12 @@ basic_type!(
 );
 
 basic_type!(
+    /// Unique identifier of the ethereum chain
+    ChainId,
+    u64
+);
+
+basic_type!(
     /// Unique identifier of the account in the zkSync network.
     AccountId,
     u32

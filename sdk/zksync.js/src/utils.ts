@@ -950,3 +950,21 @@ export async function getTxHash(
     let txBytes = await serializeTx(tx);
     return ethers.utils.sha256(txBytes).replace('0x', 'sync-tx:');
 }
+
+export function getDomain(chainId: number) {
+    return {
+        name: 'ZkSync',
+        version: '1.0',
+        chainId
+    };
+}
+
+export function changePubKeyEIP712Types() {
+    return {
+        ChangePubKey: [
+            { name: 'pubKeyHash', type: 'bytes20' },
+            { name: 'nonce', type: 'uint32' },
+            { name: 'accountId', type: 'uint32' }
+        ]
+    };
+}

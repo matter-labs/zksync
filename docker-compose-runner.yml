@@ -3,7 +3,7 @@ services:
   postgres:
     image: "postgres:12"
     environment:
-        - POSTGRES_HOST_AUTH_METHOD=trust
+      - POSTGRES_HOST_AUTH_METHOD=trust
 
   geth:
     image: "matterlabs/geth:latest"
@@ -33,14 +33,13 @@ services:
     volumes:
       - .:/usr/src/zksync
       - /usr/src/cache:/usr/src/cache
-      - /usr/src/keys:/usr/src/keys
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${HOST_GCS_KEY_PATH:-/etc/sa_secret/sa_key.json}:/etc/sa_secret/sa_key.json
     environment:
       - IN_DOCKER=true
       - CACHE_DIR=/usr/src/cache
       - SCCACHE_CACHE_SIZE=50g
-      - SCCACHE_GCS_BUCKET=sccache-zksync-ci
-      - SCCACHE_GCS_KEY_PATH=/etc/sa_secret/sa_key.json
+      - SCCACHE_GCS_BUCKET=matterlabs-infra-sccache-storage
+      - SCCACHE_GCS_OAUTH_URL=http://169.254.169.254/computeMetadata/v1/instance/service-accounts/gha-ci-runners@matterlabs-infra.iam.gserviceaccount.com/token
       - SCCACHE_GCS_RW_MODE=READ_WRITE
+      - SCCACHE_ERROR_LOG=/tmp/sccache_log.txt
       - CI=1

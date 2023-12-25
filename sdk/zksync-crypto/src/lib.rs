@@ -188,7 +188,7 @@ pub fn verify_musig(msg: &[u8], signature: &[u8]) -> Result<bool, JsValue> {
 
     let pubkey = &signature[..PACKED_POINT_SIZE];
     let pubkey = JUBJUB_PARAMS
-        .with(|params| edwards::Point::read(&*pubkey, params).map(PublicKey))
+        .with(|params| edwards::Point::read(pubkey, params).map(PublicKey))
         .map_err(|_| JsValue::from_str("couldn't read public key"))?;
 
     let signature = deserialize_signature(&signature[PACKED_POINT_SIZE..])?;

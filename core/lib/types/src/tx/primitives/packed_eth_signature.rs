@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use crate::eip712_signature::{EIP712TypedStructure, Eip712Domain};
 use parity_crypto::{
     publickey::{public_to_address, recover, sign, KeyPair, Signature as ETHSignature},
     Keccak256,
@@ -80,8 +81,21 @@ impl PackedEthSignature {
     /// Checks signature and returns ethereum address of the signer.
     /// message should be the same message that was passed to `eth.sign`(or similar) method
     /// as argument. No hashing and prefixes required.
-    pub fn signature_recover_signer(&self, msg: &[u8]) -> Result<Address, PackedETHSignatureError> {
+    pub fn signature_recover_signer_from_raw_message(
+        &self,
+        msg: &[u8],
+    ) -> Result<Address, PackedETHSignatureError> {
         let signed_bytes = Self::message_to_signed_bytes(msg);
+        self.signature_recover_signer_from_hash(signed_bytes)
+    }
+
+    /// Checks signature and returns ethereum address of the signer.
+    /// The hash should be from the same message that was passed to `eth.sign`(or similar) method
+    /// as argument.
+    pub fn signature_recover_signer_from_hash(
+        &self,
+        signed_bytes: H256,
+    ) -> Result<Address, PackedETHSignatureError> {
         let public_key = recover(&self.0, &signed_bytes)?;
         Ok(public_to_address(&public_key))
     }
@@ -92,6 +106,38 @@ impl PackedEthSignature {
     ) -> Result<Address, PackedETHSignatureError> {
         Ok(KeyPair::from_secret((*private_key).into())?.address())
     }
+
+    /// Signs typed struct using ethereum private key according to the EIP-712 signature standard.
+    /// Result of this function is the equivalent of RPC calling `eth_signTypedData`.
+    pub fn sign_typed_data(
+        private_key: &H256,
+        domain: &Eip712Domain,
+        typed_struct: &impl EIP712TypedStructure,
+    ) -> Result<PackedEthSignature, PackedETHSignatureError> {
+        let secret_key = (*private_key).into();
+        let signed_bytes = Self::typed_data_to_signed_bytes(domain, typed_struct);
+        let signature = sign(&secret_key, &signed_bytes)?;
+        Ok(PackedEthSignature(signature))
+    }
+
+    pub fn typed_data_to_signed_message(
+        domain: &Eip712Domain,
+        typed_struct: &impl EIP712TypedStructure,
+    ) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice("\x19\x01".as_bytes());
+        bytes.extend_from_slice(domain.hash_struct().as_bytes());
+        bytes.extend_from_slice(typed_struct.hash_struct().as_bytes());
+        bytes
+    }
+
+    pub fn typed_data_to_signed_bytes(
+        domain: &Eip712Domain,
+        typed_struct: &impl EIP712TypedStructure,
+    ) -> H256 {
+        let bytes = Self::typed_data_to_signed_message(domain, typed_struct);
+        bytes.keccak256().into()
+    }
 }
 
 impl Serialize for PackedEthSignature {
@@ -100,7 +146,7 @@ impl Serialize for PackedEthSignature {
         S: Serializer,
     {
         let packed_signature = self.serialize_packed();
-        ZeroPrefixHexSerde::serialize(&packed_signature, serializer)
+        ZeroPrefixHexSerde::serialize(packed_signature, serializer)
     }
 }
 

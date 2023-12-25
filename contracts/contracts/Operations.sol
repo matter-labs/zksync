@@ -27,6 +27,13 @@ library Operations {
         Swap
     }
 
+    /// @notice zkSync withdrawal types
+    enum WithdrawalType {
+        PartialExit,
+        ForcedExit,
+        FullExit
+    }
+
     // Byte lengths
 
     uint8 internal constant OP_TYPE_BYTES = 1;
@@ -191,7 +198,8 @@ library Operations {
         ECRECOVER,
         CREATE2,
         OldECRECOVER,
-        ECRECOVERV2
+        ECRECOVERV2,
+        EIP712
     }
 
     struct ChangePubKey {

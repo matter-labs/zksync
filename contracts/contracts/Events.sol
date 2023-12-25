@@ -15,10 +15,15 @@ interface Events {
     event BlockVerification(uint32 indexed blockNumber);
 
     /// @notice Event emitted when user funds are withdrawn from the zkSync state and contract
-    event Withdrawal(uint16 indexed tokenId, uint128 amount);
+    event Withdrawal(address indexed owner, uint16 indexed tokenId, uint128 amount);
 
     /// @notice Event emitted when user funds are withdrawn from the zkSync state but not from contract
-    event WithdrawalPending(uint16 indexed tokenId, address indexed recepient, uint128 amount);
+    event WithdrawalPending(
+        uint16 indexed tokenId,
+        address indexed recipient,
+        uint128 amount,
+        Operations.WithdrawalType withdrawalType
+    );
 
     /// @notice Event emitted when user NFT is withdrawn from the zkSync state and contract
     event WithdrawalNFT(uint32 indexed tokenId);

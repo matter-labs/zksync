@@ -12,10 +12,12 @@
 //! https://docs.sentry.io/platforms/rust/
 //!
 
+use chrono::Duration;
 use std::{borrow::Cow, str::FromStr};
 
 pub use sentry;
-use sentry::{types::Dsn, ClientInitGuard};
+use sentry::protocol::Event;
+use sentry::{types::Dsn, ClientInitGuard, ClientOptions};
 
 pub use tracing as __tracing;
 pub use tracing::{debug, info, log, trace};
@@ -91,20 +93,65 @@ pub fn init() -> VlogGuard {
     };
 
     let _sentry_guard = get_sentry_url().map(|sentry_url| {
-        sentry::init((
-            sentry_url,
-            sentry::ClientOptions {
-                release: sentry::release_name!(),
-                environment: Some(Cow::from(
-                    std::env::var("CHAIN_ETH_NETWORK").expect("Must be set"),
-                )),
-                attach_stacktrace: true,
-                ..Default::default()
-            },
-        ))
+        let options = sentry::ClientOptions {
+            release: sentry::release_name!(),
+            environment: Some(Cow::from(
+                std::env::var("CHAIN_ETH_NETWORK").expect("Must be set"),
+            )),
+            attach_stacktrace: true,
+            ..Default::default()
+        };
+        let options = options.add_integration(AddIntervalToFingerprintIntegration::new(
+            Duration::seconds(10),
+            Duration::minutes(10),
+        ));
+        sentry::init((sentry_url, options))
     });
     VlogGuard {
         _sentry_guard,
         _logger_guard,
+    }
+}
+
+struct AddIntervalToFingerprintIntegration {
+    panic_interval: Duration,
+    error_interval: Duration,
+}
+
+impl AddIntervalToFingerprintIntegration {
+    fn new(panic_interval: Duration, error_interval: Duration) -> Self {
+        Self {
+            panic_interval,
+            error_interval,
+        }
+    }
+}
+
+impl sentry::Integration for AddIntervalToFingerprintIntegration {
+    fn process_event(
+        &self,
+        mut event: Event<'static>,
+        _options: &ClientOptions,
+    ) -> Option<Event<'static>> {
+        let mut fingerprints = match event.fingerprint {
+            Cow::Borrowed(slice) => slice.to_vec(),
+            Cow::Owned(vec) => vec,
+        };
+        if event.level == sentry::Level::Fatal {
+            let message = event
+                .exception
+                .first()
+                .and_then(|exception| exception.value.as_ref().cloned())
+                .unwrap_or_default();
+            fingerprints.push(Cow::Owned(message));
+        }
+        let interval = match event.level {
+            sentry::Level::Fatal => self.panic_interval.num_seconds(),
+            _ => self.error_interval.num_seconds(),
+        };
+        let time_fingerprint = chrono::Utc::now().timestamp() / interval;
+        fingerprints.push(Cow::Owned(time_fingerprint.to_string()));
+        event.fingerprint = Cow::Owned(fingerprints);
+        Some(event)
     }
 }

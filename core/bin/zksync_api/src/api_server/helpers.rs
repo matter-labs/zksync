@@ -23,7 +23,7 @@ pub fn try_parse_hash(query: &str) -> Result<H256, hex::FromHexError> {
     let mut slice = [0_u8; HASH_SIZE];
 
     let tx_hex = remove_prefix(query);
-    hex::decode_to_slice(&tx_hex, &mut slice)?;
+    hex::decode_to_slice(tx_hex, &mut slice)?;
 
     Ok(H256::from_slice(&slice))
 }
@@ -52,9 +52,7 @@ async fn depositing_from_pending_ops(
 
         let expected_accept_block = op.received_on_block + confirmations_for_eth_event;
 
-        let balance = balances
-            .entry(token_symbol)
-            .or_insert_with(DepositingFunds::default);
+        let balance: &mut DepositingFunds = balances.entry(token_symbol).or_default();
 
         balance.amount += BigUint::from(op.amount);
 

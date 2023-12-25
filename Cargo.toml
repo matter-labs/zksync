@@ -8,8 +8,7 @@ members = [
     "core/bin/parse_pub_data",
     "core/bin/block_revert",
     "core/bin/remove_proofs",
-    "core/bin/tree_cache_updater",
-    "core/bin/add_seq_no",
+    "core/bin/tx_count_migration",
 
     # Server micro-services
     "core/bin/zksync_api",

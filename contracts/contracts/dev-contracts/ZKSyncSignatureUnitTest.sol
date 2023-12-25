@@ -7,7 +7,7 @@ pragma experimental ABIEncoderV2;
 import "../ZkSync.sol";
 
 contract ZKSyncSignatureUnitTest is ZkSync {
-    function changePubkeySignatureCheckECRECOVER(Operations.ChangePubKey memory _changePk, bytes memory _witness)
+    function changePubkeySignatureCheckECRECOVER(Operations.ChangePubKey memory _changePk, bytes calldata _witness)
         external
         pure
         returns (bool)
@@ -15,7 +15,7 @@ contract ZKSyncSignatureUnitTest is ZkSync {
         return verifyChangePubkeyECRECOVER(_witness, _changePk);
     }
 
-    function changePubkeySignatureCheckCREATE2(Operations.ChangePubKey memory _changePk, bytes memory _witness)
+    function changePubkeySignatureCheckCREATE2(Operations.ChangePubKey memory _changePk, bytes calldata _witness)
         external
         pure
         returns (bool)
@@ -29,5 +29,13 @@ contract ZKSyncSignatureUnitTest is ZkSync {
         returns (address)
     {
         return Utils.recoverAddressFromEthSignature(_signature, _messageHash);
+    }
+
+    function changePubkeySignatureCheckEIP712(Operations.ChangePubKey memory _changePk, bytes calldata _witness)
+        external
+        pure
+        returns (bool)
+    {
+        return verifyChangePubkeyEIP712(_witness, _changePk);
     }
 }

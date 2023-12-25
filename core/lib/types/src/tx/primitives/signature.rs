@@ -118,8 +118,8 @@ impl Default for TxSignature {
 
 impl std::fmt::Debug for TxSignature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let hex_pk = hex::encode(&self.pub_key.serialize_packed().unwrap());
-        let hex_sign = hex::encode(&self.signature.serialize_packed().unwrap());
+        let hex_pk = hex::encode(self.pub_key.serialize_packed().unwrap());
+        let hex_sign = hex::encode(self.signature.serialize_packed().unwrap());
         write!(f, "{{ pub_key: {}, sign: {} }}", hex_pk, hex_sign)
     }
 }

@@ -3,6 +3,8 @@ import { EthMessageSigner } from './eth-message-signer';
 import { SyncProvider } from './provider-interface';
 import { Create2WalletSigner, Signer, unableToSign } from './signer';
 import { BatchBuilderInternalTx } from './batch-builder';
+import { TypedDataSigner } from '@ethersproject/abstract-signer';
+
 import {
     Address,
     ChangePubKey,
@@ -29,15 +31,22 @@ import {
     TokenRatio,
     WeiRatio
 } from './types';
-import { getChangePubkeyLegacyMessage, getChangePubkeyMessage, MAX_TIMESTAMP, isNFT } from './utils';
+import {
+    getChangePubkeyLegacyMessage,
+    getChangePubkeyMessage,
+    MAX_TIMESTAMP,
+    isNFT,
+    changePubKeyEIP712Types
+} from './utils';
 import { Transaction, submitSignedTransaction } from './operations';
 import { AbstractWallet } from './abstract-wallet';
+import { getDomain } from './utils';
 
 export { Transaction, ETHOperation, submitSignedTransaction, submitSignedTransactionsBatch } from './operations';
 
 export class Wallet extends AbstractWallet {
     protected constructor(
-        public _ethSigner: ethers.Signer,
+        public _ethSigner: ethers.Signer & TypedDataSigner,
         private _ethMessageSigner: EthMessageSigner,
         cachedAddress: Address,
         public signer?: Signer,
@@ -52,7 +61,7 @@ export class Wallet extends AbstractWallet {
     //
 
     static async fromEthSigner(
-        ethWallet: ethers.Signer,
+        ethWallet: ethers.Signer & TypedDataSigner,
         provider: SyncProvider,
         signer?: Signer,
         accountId?: number,
@@ -95,7 +104,7 @@ export class Wallet extends AbstractWallet {
     }
 
     static async fromEthSignerNoKeys(
-        ethWallet: ethers.Signer,
+        ethWallet: ethers.Signer & TypedDataSigner,
         provider: SyncProvider,
         accountId?: number,
         ethSignerType?: EthSignerType
@@ -115,7 +124,7 @@ export class Wallet extends AbstractWallet {
     }
 
     static async fromSyncSigner(
-        ethWallet: ethers.Signer,
+        ethWallet: ethers.Signer & TypedDataSigner,
         syncSigner: Signer,
         provider: SyncProvider,
         accountId?: number
@@ -130,7 +139,7 @@ export class Wallet extends AbstractWallet {
     // Abstract getters
     //
 
-    override ethSigner(): ethers.Signer {
+    override ethSigner(): ethers.Signer & TypedDataSigner {
         return this._ethSigner;
     }
 
@@ -318,6 +327,24 @@ export class Wallet extends AbstractWallet {
             const ethSignature = (await this.ethMessageSigner().getEthMessageSignature(changePubKeyMessage)).signature;
             ethAuthData = {
                 type: 'ECDSA',
+                ethSignature,
+                batchHash: changePubKey.batchHash
+            };
+        } else if (changePubKey.ethAuthType === 'EIP712') {
+            const domain = getDomain(await this.ethSigner().getChainId());
+
+            const types = changePubKeyEIP712Types();
+            const pubKeyHash = newPubKeyHash.replace('sync:', '0x');
+
+            const changePubKeyMessage = {
+                pubKeyHash,
+                nonce: changePubKey.nonce,
+                accountId: await this.getAccountId()
+            };
+
+            const ethSignature = await this.ethSigner()._signTypedData(domain, types, changePubKeyMessage);
+            ethAuthData = {
+                type: 'EIP712',
                 ethSignature,
                 batchHash: changePubKey.batchHash
             };

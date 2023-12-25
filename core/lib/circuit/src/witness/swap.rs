@@ -73,8 +73,8 @@ impl Witness for SwapWitness<Bn256> {
 
     fn apply_tx(tree: &mut CircuitAccountTree, swap: &SwapOp) -> Self {
         let order_0 = OrderData {
-            account: *swap.accounts.0 as u32,
-            recipient: *swap.recipients.0 as u32,
+            account: *swap.accounts.0,
+            recipient: *swap.recipients.0,
             recipient_address: eth_address_to_fr(&swap.tx.orders.0.recipient_address),
             amount: swap.tx.orders.0.amount.to_u128().unwrap(),
             price_sell: swap.tx.orders.0.price.0.to_u128().unwrap(),
@@ -85,8 +85,8 @@ impl Witness for SwapWitness<Bn256> {
         };
 
         let order_1 = OrderData {
-            account: *swap.accounts.1 as u32,
-            recipient: *swap.recipients.1 as u32,
+            account: *swap.accounts.1,
+            recipient: *swap.recipients.1,
             recipient_address: eth_address_to_fr(&swap.tx.orders.1.recipient_address),
             amount: swap.tx.orders.1.amount.to_u128().unwrap(),
             price_sell: swap.tx.orders.1.price.0.to_u128().unwrap(),
@@ -101,14 +101,11 @@ impl Witness for SwapWitness<Bn256> {
                 swap.tx.amounts.0.to_u128().unwrap(),
                 swap.tx.amounts.1.to_u128().unwrap(),
             ),
-            tokens: (
-                *swap.tx.orders.0.token_sell as u32,
-                *swap.tx.orders.1.token_sell as u32,
-            ),
+            tokens: (*swap.tx.orders.0.token_sell, *swap.tx.orders.1.token_sell),
             fee: swap.tx.fee.to_u128().unwrap(),
-            fee_token: *swap.tx.fee_token as u32,
+            fee_token: *swap.tx.fee_token,
             orders: (order_0, order_1),
-            submitter: *swap.submitter as u32,
+            submitter: *swap.submitter,
             submitter_address: eth_address_to_fr(&swap.tx.submitter_address),
             nonce: *swap.tx.nonce,
         };

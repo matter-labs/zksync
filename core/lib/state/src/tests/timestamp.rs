@@ -1,12 +1,12 @@
-use crate::tests::{AccountState::*, PlasmaTestBuilder};
+use chrono::Utc;
 use num::BigUint;
-use vlog::sentry::types::Utc;
 use zksync_types::{
     account::PubKeyHash,
     tx::{ChangePubKey, TimeRange, Withdraw},
     SignedZkSyncTx, TokenId, ZkSyncTx,
 };
 
+use crate::tests::{AccountState::*, PlasmaTestBuilder};
 /// Check that transaction fails if timestamp is invalid
 #[test]
 fn invalid_timestamp_valid_from() {
@@ -29,6 +29,7 @@ fn invalid_timestamp_valid_from() {
         time_range,
         None,
         &sk,
+        None,
     )
     .expect("Failed to sign ChangePubkey");
 
@@ -64,6 +65,7 @@ fn invalid_timestamp_valid_until() {
         time_range,
         None,
         &sk,
+        None,
     )
     .expect("Failed to sign ChangePubkey");
 
@@ -100,6 +102,7 @@ fn batch_invalid_timestamp() {
         time_range,
         None,
         &sk,
+        None,
     )
     .expect("Failed to sign ChangePubkey");
 

@@ -253,7 +253,7 @@ impl FloatConversions {
 
         let max_power = (1 << exponent_length) - 1;
 
-        let max_exponent = (exponent_base as u128).saturating_pow(max_power);
+        let max_exponent = exponent_base.saturating_pow(max_power);
 
         let max_mantissa = (1u128 << mantissa_length) - 1;
 
@@ -326,7 +326,7 @@ impl FloatConversions {
 
         let max_power = (1 << exponent_length) - 1;
 
-        let max_exponent = (exponent_base as u128).saturating_pow(max_power);
+        let max_exponent = exponent_base.saturating_pow(max_power);
 
         let max_mantissa = (1u128 << mantissa_length) - 1;
 
@@ -379,7 +379,7 @@ pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     assert!(msg_bits.len() <= params::PAD_MSG_BEFORE_HASH_BITS_LEN);
     msg_bits.resize(params::PAD_MSG_BEFORE_HASH_BITS_LEN, false);
     let hasher = &params::RESCUE_HASHER as &BabyRescueHasher;
-    let hash_fr = hasher.hash_bits(msg_bits.into_iter());
+    let hash_fr = hasher.hash_bits(msg_bits);
     let mut hash_bits = Vec::new();
     append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
     BitConvert::into_bytes(hash_bits)
@@ -395,7 +395,7 @@ pub fn rescue_hash_orders(msg: &[u8]) -> Vec<u8> {
     assert_eq!(msg.len(), 178);
     let msg_bits = BitConvert::from_be_bytes(msg);
     let hasher = &params::RESCUE_HASHER as &BabyRescueHasher;
-    let hash_fr = hasher.hash_bits(msg_bits.into_iter());
+    let hash_fr = hasher.hash_bits(msg_bits);
     // 248 == bits in max whole number of bytes that fit into Fr
     let hash_bits = hash_fr.get_bits_le_fixed(248);
     BitConvert::into_bytes_ordered(hash_bits)

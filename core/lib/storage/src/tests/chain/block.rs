@@ -172,10 +172,10 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
         let mut queries = vec![
             expected_block_detail.block_number.to_string(),
             hex::encode(&expected_block_detail.new_state_root),
-            hex::encode(&expected_block_detail.commit_tx_hash.as_ref().unwrap()),
+            hex::encode(expected_block_detail.commit_tx_hash.as_ref().unwrap()),
         ];
         if let Some(verify_tx_hash) = expected_block_detail.verify_tx_hash.as_ref() {
-            queries.push(hex::encode(&verify_tx_hash));
+            queries.push(hex::encode(verify_tx_hash));
         }
 
         for query in queries {
@@ -715,7 +715,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
             false,
             TokenId(0),
             Default::default(),
-            ChangePubKeyType::ECDSA,
+            ChangePubKeyType::EIP712,
             Default::default(),
         );
 
@@ -817,7 +817,7 @@ async fn pending_block_workflow(mut storage: StorageProcessor<'_>) -> QueryResul
         .expect("No pending block");
     assert_eq!(pending_block.number, pending_block_1.number);
     assert_eq!(pending_block.chunks_left, pending_block_1.chunks_left);
-    assert_eq!(pending_block.chunks_left, chunks_left as usize);
+    assert_eq!(pending_block.chunks_left, chunks_left);
     assert_eq!(
         pending_block.unprocessed_priority_op_before,
         pending_block_1.unprocessed_priority_op_before
@@ -1314,7 +1314,6 @@ async fn test_get_block_transactions_hashes(mut storage: StorageProcessor<'_>) -
         .await?;
     let len = setup.blocks[0].block_transactions.len();
     let expected: Vec<Vec<u8>> = (0..len)
-        .into_iter()
         .map(|index| setup.get_tx_hash(0, index).as_ref().to_vec())
         .collect();
     assert_eq!(after_commit, expected);

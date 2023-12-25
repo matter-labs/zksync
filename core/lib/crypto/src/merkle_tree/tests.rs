@@ -62,7 +62,7 @@ fn simulate_transfer_to_new() {
 fn small_input_and_middle_leaf() {
     use crate::ff::from_hex;
     let depth = 3;
-    let elements = vec![1u64, 2u64, 3u64, 4u64, 5u64, 6u64, 7u64, 8u64];
+    let elements = [1u64, 2u64, 3u64, 4u64, 5u64, 6u64, 7u64, 8u64];
     let root_hashes: Vec<Fr> = vec![
         from_hex("0x18ddd3700477ce74623ee03932d61dba8e754946e8a67b61a02058f271e37599").unwrap(),
         from_hex("0x0761a365c4a300023c342e2f5b1182378f8110fa4d9eb8ab8d07e032ec7fadd6").unwrap(),
@@ -103,7 +103,7 @@ fn small_input_and_middle_leaf() {
 fn small_input_and_leftmost_leaf() {
     use crate::ff::from_hex;
     let depth = 3;
-    let elements = vec![
+    let elements = [
         52987011536924u64,
         30064785464u64,
         108088250798717285u64,
@@ -113,7 +113,7 @@ fn small_input_and_leftmost_leaf() {
         6990032406494164777u64,
         3948052069168408798u64,
     ];
-    let root_hashes: Vec<Fr> = vec![
+    let root_hashes: [Fr; 8] = [
         from_hex("0x1839cadd698dcea410ecb73d700b27198798b6b5c8e7d01f92d9e2cc37d4160f").unwrap(),
         from_hex("0x1efe48f5d8432d5b9557503feb95ba4fea7e30a9a30c9c411315937927c2b15f").unwrap(),
         from_hex("0x0975cf0b6e47a02f3d7a723d8acebeaa1423cdf6357352d4510f28e8dd81f1c8").unwrap(),

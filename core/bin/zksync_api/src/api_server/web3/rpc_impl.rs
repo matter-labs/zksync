@@ -9,6 +9,7 @@ use zksync_storage::{
     chain::{block::records::StorageBlock, operations_ext::records::Web3TxReceipt},
     StorageProcessor,
 };
+use zksync_types::withdrawals::WithdrawalPendingEvent;
 use zksync_types::{ExecutedOperations, TokenId, ZkSyncOp};
 // Local uses
 use super::{
@@ -312,6 +313,23 @@ impl Web3RpcApp {
 
         metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "call");
         result.map(Bytes)
+    }
+
+    pub async fn _impl_check_withdrawal(
+        self,
+        tx_hash: H256,
+    ) -> Result<Vec<WithdrawalPendingEvent>> {
+        let start = Instant::now();
+        let mut storage = self.access_storage().await?;
+
+        let withdrawals = storage
+            .withdrawals_schema()
+            .get_finalized_withdrawals(tx_hash)
+            .await
+            .map_err(|_| Error::internal_error())?;
+
+        metrics::histogram!("api", start.elapsed(), "type" => "web3", "endpoint_name" => "check_withdrawal");
+        Ok(withdrawals)
     }
 
     pub(crate) async fn logs_from_receipt(

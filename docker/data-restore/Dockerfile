@@ -1,5 +1,4 @@
-FROM rust:1.60
-
+FROM rust:1.67
 WORKDIR /usr/src/zksync
 
 RUN apt update && apt install wget openssl libssl-dev pkg-config npm curl libpq5 libpq-dev lsb-release -y
@@ -32,5 +31,6 @@ ENV ZKSYNC_HOME=/usr/src/zksync
 ENV PATH="${ZKSYNC_HOME}/bin:${PATH}"
 ENV CONFIG_PATH=/usr/src/configs
 ENV PG_DUMP_PATH=/pg_restore
+USER root
 
 ENTRYPOINT ["data-restore-entry.sh"]

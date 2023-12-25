@@ -246,7 +246,7 @@ export interface ForcedExit {
     validUntil: number;
 }
 
-export type ChangePubkeyTypes = 'Onchain' | 'ECDSA' | 'CREATE2' | 'ECDSALegacyMessage';
+export type ChangePubkeyTypes = 'Onchain' | 'ECDSA' | 'CREATE2' | 'ECDSALegacyMessage' | 'EIP712';
 
 export interface ChangePubKeyOnchain {
     type: 'Onchain';
@@ -254,6 +254,12 @@ export interface ChangePubKeyOnchain {
 
 export interface ChangePubKeyECDSA {
     type: 'ECDSA';
+    ethSignature: string;
+    batchHash?: string;
+}
+
+export interface ChangePubKeyEIP712 {
+    type: 'EIP712';
     ethSignature: string;
     batchHash?: string;
 }
@@ -274,7 +280,7 @@ export interface ChangePubKey {
     fee: BigNumberish;
     nonce: number;
     signature?: Signature;
-    ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2;
+    ethAuthData?: ChangePubKeyOnchain | ChangePubKeyECDSA | ChangePubKeyCREATE2 | ChangePubKeyEIP712;
     ethSignature?: string;
     validFrom: number;
     validUntil: number;

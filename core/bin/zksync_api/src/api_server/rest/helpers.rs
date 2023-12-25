@@ -94,7 +94,7 @@ pub fn priority_op_to_tx_history(
         .map(|t| t.symbol.clone())
         .unwrap_or_else(|| "unknown".into());
 
-    let hash_str = format!("0x{}", hex::encode(&op.eth_hash));
+    let hash_str = format!("0x{}", hex::encode(op.eth_hash));
     let pq_id = Some(op.serial_id as i64);
 
     // Account ID may not exist for depositing ops, so it'll be `null`.

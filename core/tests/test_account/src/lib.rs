@@ -3,9 +3,11 @@ use std::{fmt, sync::Mutex};
 // External uses
 use num::BigUint;
 // Workspace uses
-use zksync_basic_types::H256;
+use zksync_basic_types::{ChainId, H256};
 use zksync_crypto::rand::{thread_rng, Rng, SeedableRng, XorShiftRng};
 use zksync_crypto::{priv_key_from_fs, PrivateKey};
+use zksync_types::eip712_signature::Eip712Domain;
+use zksync_types::tx::ChangePubKeyEIP712Data;
 use zksync_types::{
     tx::{
         ChangePubKey, ChangePubKeyCREATE2Data, ChangePubKeyECDSAData, ChangePubKeyEthAuthData,
@@ -14,6 +16,8 @@ use zksync_types::{
     AccountId, Address, Close, ForcedExit, MintNFT, Nonce, Order, PubKeyHash, Swap, TokenId,
     Transfer, Withdraw, WithdrawNFT,
 };
+
+const CHAIN_ID: ChainId = ChainId(9);
 
 #[derive(Debug, Clone)]
 pub enum ZkSyncETHAccountData {
@@ -178,7 +182,7 @@ impl ZkSyncAccount {
             *recipient,
             fee,
             fee_token,
-            nonce.unwrap_or_else(|| *stored_nonce),
+            nonce.unwrap_or(*stored_nonce),
             &self.private_key,
         )
         .expect("Failed to sign mint nft");
@@ -223,7 +227,7 @@ impl ZkSyncAccount {
             token,
             fee_token,
             fee,
-            nonce.unwrap_or_else(|| *stored_nonce),
+            nonce.unwrap_or(*stored_nonce),
             time_range,
             &self.private_key,
         )
@@ -264,7 +268,7 @@ impl ZkSyncAccount {
             self.get_account_id()
                 .expect("can't sign tx without account id"),
             *recipient,
-            nonce.unwrap_or_else(|| *stored_nonce),
+            nonce.unwrap_or(*stored_nonce),
             token_sell,
             token_buy,
             (price_sell, price_buy),
@@ -297,7 +301,7 @@ impl ZkSyncAccount {
             self.get_account_id()
                 .expect("can't sign tx without account id"),
             self.address,
-            nonce.unwrap_or_else(|| *stored_nonce),
+            nonce.unwrap_or(*stored_nonce),
             orders,
             amounts,
             fee,
@@ -346,7 +350,7 @@ impl ZkSyncAccount {
             token_id,
             amount,
             fee,
-            nonce.unwrap_or_else(|| *stored_nonce),
+            nonce.unwrap_or(*stored_nonce),
             time_range,
             &self.private_key,
         )
@@ -387,7 +391,7 @@ impl ZkSyncAccount {
             *target,
             token_id,
             fee,
-            nonce.unwrap_or_else(|| *stored_nonce),
+            nonce.unwrap_or(*stored_nonce),
             time_range,
             &self.private_key,
         )
@@ -423,7 +427,7 @@ impl ZkSyncAccount {
             token_id,
             amount,
             fee,
-            nonce.unwrap_or_else(|| *stored_nonce),
+            nonce.unwrap_or(*stored_nonce),
             time_range,
             &self.private_key,
         )
@@ -450,7 +454,7 @@ impl ZkSyncAccount {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let mut close = Close {
             account: self.address,
-            nonce: nonce.unwrap_or_else(|| *stored_nonce),
+            nonce: nonce.unwrap_or(*stored_nonce),
             signature: TxSignature::default(),
             time_range: Default::default(),
         };
@@ -477,7 +481,7 @@ impl ZkSyncAccount {
             .unwrap()
             .expect("can't sign tx withoud account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
-        let nonce = nonce.unwrap_or_else(|| *stored_nonce);
+        let nonce = nonce.unwrap_or(*stored_nonce);
 
         let mut change_pubkey = ChangePubKey::new_signed(
             account_id,
@@ -489,6 +493,7 @@ impl ZkSyncAccount {
             time_range,
             None,
             &self.private_key,
+            Some(CHAIN_ID),
         )
         .expect("Can't sign ChangePubKey operation");
 
@@ -514,6 +519,23 @@ impl ZkSyncAccount {
                     ChangePubKeyEthAuthData::CREATE2(create2_data.clone())
                 } else {
                     panic!("CREATE2 ChangePubKey can only be executed for CREATE2 account");
+                }
+            }
+            ChangePubKeyType::EIP712 => {
+                if let ZkSyncETHAccountData::EOA { eth_private_key } = &self.eth_account_data {
+                    let domain = Eip712Domain::new(CHAIN_ID);
+                    let eth_signature = PackedEthSignature::sign_typed_data(
+                        eth_private_key,
+                        &domain,
+                        &change_pubkey,
+                    )
+                    .expect("Signature should succeed");
+                    ChangePubKeyEthAuthData::EIP712(ChangePubKeyEIP712Data {
+                        eth_signature,
+                        batch_hash: Default::default(),
+                    })
+                } else {
+                    panic!("EIP712 ChangePubKey can only be executed for EOA account");
                 }
             }
         };

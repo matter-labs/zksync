@@ -114,7 +114,7 @@ impl TokenWatcher for UniswapTokenWatcher {
                 return Ok(amount);
             }
             Err(err) => {
-                vlog::error!("Error in api: {:?}", err);
+                vlog::warn!("Error in api: {:?}", err);
             }
         }
 

@@ -34,7 +34,7 @@ async fn aggregated_operations(mut storage: StorageProcessor<'_>) -> QueryResult
         .await?;
 
     let stored_operation = OperationsSchema(&mut storage)
-        .get_stored_aggregated_operation(BlockNumber(block_number as u32), action_type)
+        .get_stored_aggregated_operation(BlockNumber(block_number), action_type)
         .await
         .unwrap();
 

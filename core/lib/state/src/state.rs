@@ -83,7 +83,7 @@ impl ZkSyncState {
                 next_free_id = std::cmp::max(next_free_id, **account.0 + 1);
             }
         }
-        empty.next_free_id = AccountId(next_free_id as u32);
+        empty.next_free_id = AccountId(next_free_id);
 
         for (id, account) in accounts {
             empty.insert_account(id, account);
@@ -527,7 +527,7 @@ impl ZkSyncState {
 mod tests {
     use super::*;
     use crate::tests::{AccountState::*, PlasmaTestBuilder};
-    use vlog::sentry::types::Utc;
+    use chrono::Utc;
     use zksync_crypto::rand::{Rng, SeedableRng, XorShiftRng};
     use zksync_types::{
         tx::{Transfer, Withdraw},
@@ -794,7 +794,7 @@ mod tests {
     #[should_panic(expected = "assertion failed: self.get_account_by_address(&address).is_none()")]
     fn create_two_accounts_with_same_addresses() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
-        let random_addresses = vec![
+        let random_addresses = [
             Address::from(rng.gen::<[u8; 20]>()),
             Address::from(rng.gen::<[u8; 20]>()),
         ];
@@ -823,7 +823,7 @@ mod tests {
     fn apply_account_updates_success() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
         let token_id = TokenId(0);
-        let random_addresses = vec![
+        let random_addresses = [
             Address::from(rng.gen::<[u8; 20]>()),
             Address::from(rng.gen::<[u8; 20]>()),
         ];
@@ -1035,7 +1035,7 @@ mod tests {
                 },
             ),
         ];
-        let expected_ids = vec![1, 2, 1, 0];
+        let expected_ids = [1, 2, 1, 0];
         for (update, expected_id) in updates.iter().zip(expected_ids.iter()) {
             initial_plasma_state.apply_account_updates(vec![update.clone()]);
             assert_eq!(*initial_plasma_state.next_free_id, *expected_id);
@@ -1099,7 +1099,7 @@ mod tests {
     }
 
     /// Checks if remove_account panics if account is not last.
-    #[should_panic(expected = "assertion failed: `(left == right)")]
+    #[should_panic(expected = "assertion `left == right` failed")]
     #[test]
     fn remove_not_last_account() {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);

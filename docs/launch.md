@@ -100,7 +100,7 @@ see `* dev` inoutput.
 **Problem**. `zk init` fails with the following error:
 
 ```
-Initializing download: https://universal-setup.ams3.digitaloceanspaces.com/setup_2%5E20.key
+Initializing download: https://storage.googleapis.com/universal-setup/setup_2%5E20.key
 SSL error: certificate verify failed
 ```
 

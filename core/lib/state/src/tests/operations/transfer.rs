@@ -1,6 +1,6 @@
 use crate::tests::{AccountState::*, PlasmaTestBuilder};
+use chrono::Utc;
 use num::{BigUint, Zero};
-use vlog::sentry::types::Utc;
 use web3::types::H160;
 use zksync_types::{AccountId, AccountUpdate, Nonce, SignedZkSyncTx, TokenId, Transfer, ZkSyncTx};
 

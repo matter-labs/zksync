@@ -120,9 +120,9 @@ impl<'a> WitnessBuilder<'a> {
         pubdata: Vec<bool>,
         offset_commitment: Vec<bool>,
     ) {
-        self.operations.extend(ops.into_iter());
-        self.pubdata.extend(pubdata.into_iter());
-        self.offset_commitment.extend(offset_commitment.into_iter());
+        self.operations.extend(ops);
+        self.pubdata.extend(pubdata);
+        self.offset_commitment.extend(offset_commitment);
     }
 
     /// Add noops if pubdata isn't of right size
@@ -178,7 +178,7 @@ impl<'a> WitnessBuilder<'a> {
             let (root, acc_witness) = crate::witness::utils::apply_fee(
                 self.account_tree,
                 *self.fee_account_id,
-                **token as u32,
+                **token,
                 amount.to_u128().unwrap(),
             );
             root_after_fee = root;
@@ -324,13 +324,13 @@ pub fn public_data_commitment<E: JubjubEngine>(
         BitIterator::new(block_number.unwrap().into_repr()).collect();
 
     public_data_initial_bits.extend(vec![false; 256 - block_number_bits.len()]);
-    public_data_initial_bits.extend(block_number_bits.into_iter());
+    public_data_initial_bits.extend(block_number_bits);
 
     let validator_id_bits: Vec<bool> =
         BitIterator::new(validator_address.unwrap().into_repr()).collect();
 
     public_data_initial_bits.extend(vec![false; 256 - validator_id_bits.len()]);
-    public_data_initial_bits.extend(validator_id_bits.into_iter());
+    public_data_initial_bits.extend(validator_id_bits);
 
     assert_eq!(public_data_initial_bits.len(), 512);
 
@@ -377,7 +377,7 @@ pub fn public_data_commitment<E: JubjubEngine>(
     let timstamp_unpadded_bits: Vec<bool> =
         BitIterator::new(timestamp.unwrap().into_repr()).collect();
     timestamp_bits.extend(vec![false; 256 - timstamp_unpadded_bits.len()]);
-    timestamp_bits.extend(timstamp_unpadded_bits.into_iter());
+    timestamp_bits.extend(timstamp_unpadded_bits);
     let timestamp_bytes = be_bit_vector_into_bytes(&timestamp_bits);
     let mut packed_with_timestamp = vec![];
     packed_with_timestamp.extend(hash_result.iter());

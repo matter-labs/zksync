@@ -54,7 +54,7 @@ impl<W: TokenWatcher> MarketUpdater<W> {
             .update_token_market_volume(token.id, market.clone())
             .await
         {
-            vlog::error!("Error in updating token market volume {}", e);
+            vlog::warn!("Error in updating token market volume {}", e);
         }
         Ok(market)
     }
@@ -82,7 +82,7 @@ impl<W: TokenWatcher> MarketUpdater<W> {
                 error_counter += 1;
                 vlog::warn!("Error when updating token market volume {:?}", e);
                 if error_counter >= CRITICAL_NUMBER_OF_ERRORS {
-                    vlog::error!(
+                    vlog::warn!(
                         "Critical number of error were produced when updating tokens market"
                     );
                 }
