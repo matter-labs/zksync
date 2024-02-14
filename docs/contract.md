@@ -9,7 +9,7 @@ The contract must be deployed specifying the initial ("genesis") state root hash
 
 ## Governance
 
-Governance of the network will be excerised from a separate contract registered in the ZKSync contract as
+Governance of the network will be excersised from a separate contract registered in the ZKSync contract as
 `networkGovernor`. It has the power to:
 
 - Change the set of validators.
@@ -18,7 +18,7 @@ Governance of the network will be excerised from a separate contract registered 
 
 ## Cenosorship resistance
 
-To enforece censorship-resistance and enable guaranteed retrievability of the funds, ZKSync employs the mechanisms of
+To enforce censorship-resistance and enable guaranteed retrievability of the funds, ZKSync employs the mechanisms of
 **Priority queue** (soft enforcement) and **Exodus mode** (hard enforcement).
 
 ## Deposits
