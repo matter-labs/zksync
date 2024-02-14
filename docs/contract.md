@@ -5,20 +5,20 @@
 ## Deployment
 
 The contract must be deployed specifying the initial ("genesis") state root hash, appointing the **network governor**
-(see the "Governance" section), and linking the exit queue (see the "Cenosorship resistance" section).
+(see the "Governance" section), and linking the exit queue (see the "Censorship resistance" section).
 
 ## Governance
 
-Governance of the network will be excerised from a separate contract registered in the ZKSync contract as
+Governance of the network will be exercised from a separate contract registered in the ZKSync contract as
 `networkGovernor`. It has the power to:
 
 - Change the set of validators.
 - Add new tokens (tokens can not be removed after being added).
 - Initiate migration to a new contract (see the "Migration" section).
 
-## Cenosorship resistance
+## Censorship resistance
 
-To enforece censorship-resistance and enable guaranteed retrievability of the funds, ZKSync employs the mechanisms of
+To enforce censorship-resistance and enable guaranteed retrievability of the funds, ZKSync employs the mechanisms of
 **Priority queue** (soft enforcement) and **Exodus mode** (hard enforcement).
 
 ## Deposits
@@ -52,7 +52,7 @@ priority requests** are accrued to the owners' **root-chain balances** to make t
 
 It is a standard withdrawal operation. When a block with `partial_exit` **circuit operation** is committed, **withdraw
 onchain operation** for this withdrawal is created. If the block is verified, funds from the **withdrawal onchain
-operation** are acrued to the users' **root-chain balances**.
+operation** are accrued to the users' **root-chain balances**.
 
 If the block is reverted, this **withdraw onchain operations** are simply discarded.
 
@@ -81,7 +81,7 @@ If the block is reverted, this **withdraw onchain operations** are simply discar
 If ZKSync contract has entered Exodus mode and the block is unverified, this **withdraw onchain operations** and **full
 exit priority requests** are simply discarded.
 
-## Block committment
+## Block commitment
 
 Only a sender from the validator set can commit a block.
 
@@ -161,7 +161,7 @@ balance**, and a flag will be set in order to prevent double exits of the same t
 (to be implemented later)
 
 ZKSync shall always have a strict opt-in policy: we guarantee that user funds are retrievable forever under the
-conditions a user has opted in when depositing funds, no matter what. A migration to a newer version of the contract
+conditions a user has opted-in when depositing funds, no matter what. A migration to a newer version of the contract
 shall be easy and cheap, but MUST require a separate opt-in or allow the user to exit.
 
 The update mechanism shall follow this workflow:
