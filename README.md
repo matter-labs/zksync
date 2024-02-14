@@ -39,14 +39,14 @@ The following guides for developers are available:
 - Repository architecture overview: [docs/architecture.md](docs/architecture.md).
 
 ## Projects
-
+-sdssf
 - [zkSync server](core/bin/server)
 - [zkSync prover](core/bin/prover)
 - [JavaScript SDK](sdk/zksync.js)
 - [Rust SDK](sdk/zksync-rs)
-
+-sd
 ## Changelog
-
+sd
 Since the repository is big and is split into independent components, there is a different changelog for each of its
 major parts:
 
