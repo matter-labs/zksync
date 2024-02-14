@@ -16,7 +16,7 @@ Governance of the network will be excerised from a separate contract registered 
 - Add new tokens (tokens can not be removed after being added).
 - Initiate migration to a new contract (see the "Migration" section).
 
-## Cenosorship resistance
+## Censorship resistance
 
 To enforece censorship-resistance and enable guaranteed retrievability of the funds, ZKSync employs the mechanisms of
 **Priority queue** (soft enforcement) and **Exodus mode** (hard enforcement).
