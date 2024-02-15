@@ -5,18 +5,18 @@
 ## Deployment
 
 The contract must be deployed specifying the initial ("genesis") state root hash, appointing the **network governor**
-(see the "Governance" section), and linking the exit queue (see the "Cenosorship resistance" section).
+(see the "Governance" section), and linking the exit queue (see the "Censorship resistance" section).
 
 ## Governance
 
-Governance of the network will be excerised from a separate contract registered in the ZKSync contract as
+Governance of the network will be exercised from a separate contract registered in the ZKSync contract as
 `networkGovernor`. It has the power to:
 
 - Change the set of validators.
 - Add new tokens (tokens can not be removed after being added).
 - Initiate migration to a new contract (see the "Migration" section).
 
-## Cenosorship resistance
+## Censorship resistance
 
 To enforece censorship-resistance and enable guaranteed retrievability of the funds, ZKSync employs the mechanisms of
 **Priority queue** (soft enforcement) and **Exodus mode** (hard enforcement).
@@ -81,7 +81,7 @@ If the block is reverted, this **withdraw onchain operations** are simply discar
 If ZKSync contract has entered Exodus mode and the block is unverified, this **withdraw onchain operations** and **full
 exit priority requests** are simply discarded.
 
-## Block committment
+## Block commitment
 
 Only a sender from the validator set can commit a block.
 
