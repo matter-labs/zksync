@@ -37,6 +37,7 @@ The following guides for developers are available:
 - Launching zkSync locally: [docs/launch.md](docs/launch.md).
 - Development guide: [docs/development.md](docs/development.md).
 - Repository architecture overview: [docs/architecture.md](docs/architecture.md).
+- Documentation Website: [zkSync documentation](https://docs.zksync.io/).
 
 ## Projects
 
@@ -44,6 +45,7 @@ The following guides for developers are available:
 - [zkSync prover](core/bin/prover)
 - [JavaScript SDK](sdk/zksync.js)
 - [Rust SDK](sdk/zksync-rs)
+
 
 ## Changelog
 
