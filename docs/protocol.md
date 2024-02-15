@@ -68,7 +68,7 @@
 
 zkSync implements a ZK rollup protocol (in short "rollup" below) for ETH and ERC20 fungible token transfers.
 
-General rollup workflow is as follows:
+The general rollup workflow is as follows:
 
 - Users can become owners in rollup by depositing assets from L1 or receiving a transfer from other owners.
 - Owners can transfer assets to each other.
@@ -88,18 +88,18 @@ Cryptography assumptions:
 L1 blockchain assumptions:
 
 - L1 protocol is secure.
-- L1 is eventually censorship-resistant: a sufficiently highly priced L1 tx will be mined in a block within finite time.
+- L1 is eventually censorship-resistant: a sufficiently highly priced L1 tx will be mined in a block within a finite time.
 - Owners have access to the full L1 archive (can at any time retrieve all block bodies of the L1 chain).
 
 Operational assumptions:
 
-- Rollup key is controlled by the owner and not compromised at all times.
+The rollup key is controlled by the owner and not compromised at all times.
 
 ### Protocol invariant claims
 
-- [ ] 1. Continuous ownership: assets deposited in rollup are immediately under control of the specified, unique owner.
+- [ ] 1. Continuous ownership: assets deposited in rollup are immediately under the control of the specified, unique owner.
 
-- [ ] 2. Control: assets in rollup can not be transferred (change owner), change in value, disappear or be moved out of
+- [ ] 2. Control: assets in rollup can not be transferred (change owner), change in value, disappear, or be moved out of
      rollup, unless the owner initiates a corresponding action.
 
 - [ ] 3. Eventual retrievability: assets in rollup controlled by an owner can eventually be withdrawn to the L1 address
@@ -109,9 +109,9 @@ This includes, in particular, the following claims:
 
 - [ ] 3.1. Double-spends in Rollup are not possible.
 - [ ] 3.2. Rollup always operates under full reserve: the total supply of each asset type in rollup is equal to the sum
-      of all its deposited amounts minus sum of all its withdrawn amounts.
-- [ ] 3.3. Root hash is always correct and L2 state can not be corrupted
-- [ ] 3.4. A state can always be restored from the calldata published to L1
+      of all its deposited amounts minus the sum of all its withdrawn amounts.
+- [ ] 3.3. Root hash is always correct and the L2 state can not be corrupted
+- [ ] 3.4. A state can always be restored from the call data published to L1
 - [ ] 3.5. The smart contract can not be locked out
 
 ## Data format
@@ -121,14 +121,14 @@ This includes, in particular, the following claims:
 <!-- prettier-ignore -->
 |Type|Byte len|Encoding|Comment|
 |--|--|--|--|
-|AccountId|4|BE integer|Incremented number of accounts in Rollup. New account will have the next free id. Max value is 2^32 - 1 = 4.294967295 × 10^9|
+|AccountId|4|BE integer|Incremented number of accounts in Rollup. A new account will have the next free ID. Max value is 2^32 - 1 = 4.294967295 × 10^9|
 |TokenId|2|BE integer|Incremented number of tokens in Rollup, max value is 65535|
-|PackedTxAmount|5|[Parameters](#amount-packing)|Packed transactions amounts are represented with 40 bit (5 byte) values, encoded as mantissa × 10^exponent where mantissa is represented with 35 bits, exponent is represented with 5 bits. This gives a range from 0 to 34359738368 × 10^31, providing 10 full decimal digit precision.|
-|PackedFee|2|[Parameters](#amount-packing)|Packed fees must be represented with 2 bytes: 5 bit for exponent, 11 bit for mantissa.|
+|PackedTxAmount|5|[Parameters](#amount-packing)|Packed transactions amounts are represented with 40-bit (5 byte) values, encoded as mantissa × 10^exponent where mantissa is represented with 35 bits, the exponent is represented with 5 bits. This gives a range from 0 to 34359738368 × 10^31, providing 10 full decimal digit precision.|
+|PackedFee|2|[Parameters](#amount-packing)|Packed fees must be represented with 2 bytes: 5 bit for the exponent, 11 bit for the mantissa.|
 |StateAmount|16|BE integer|State amount is represented as uint128 with a range from 0 to ~3.4 × 10^38. It allows to represent up to 3.4 × 10^20 "units" if standard Ethereum's 18 decimal symbols are used. This should be a sufficient range.|
 |Nonce|4|BE integer|Nonce is the total number of executed transactions of the account. In order to apply the update of this state, it is necessary to indicate the current account nonce in the corresponding transaction, after which it will be automatically incremented. If you specify the wrong nonce, the changes will not occur.|
 |RollupPubkeyHash|20|LE integer|To make a public key hash from a Rollup public key apply [Rescue hash function](#rescue-hash) to the `[x,y]` points of the key and then take the last 20 bytes of the result.|
-|EthAddress|20|LE integer|To make an Ethereum address from the Etherum's public key, all we need to do is to apply Keccak-256 hash function to the key and then take the last 20 bytes of the result.|
+|EthAddress|20|LE integer|To make an Ethereum address from the Ethereum's public key, all we need to do is to apply the Keccak-256 hash function to the key and then take the last 20 bytes of the result.|
 |PackedRollupPubkey|32|LE integer|A Rollup public key is the first 32 bytes of a Rollup public key |
 |TxHash|32|LE integer|To get hash for transaction apply [SHA256 function](#sha256) to concatenated bytes of [transaction fields](#zk-sync-operations)|
 |Signature|64|LE integer|Read [transaction signature](#transaction-signature)|
@@ -138,7 +138,7 @@ This includes, in particular, the following claims:
 
 ### Amount packing
 
-Amounts and fees are compressed in zkSync using simple
+Amounts and fees are compressed in zkSync using a simple
 [fundamentals of floating point arithmetic](https://en.wikipedia.org/wiki/Floating-point_arithmetic).
 
 A floating-point number has the following parts: a mantissa, a radix, and an exponent. The mantissa (always non-negative
@@ -174,7 +174,7 @@ We have directly one main `Accounts tree` and its leaves `Accounts` also have su
 #### Leaf hash
 
 **The leaf hash** is the [rescue hash](#rescue-hash) of its bit string representation described below. To get bit string
-representation each filed is encoded as bits starting from least significant (LE order for bits) and concatenated in the
+representation each file is encoded as bits starting from the least significant (LE order for bits) and concatenated in the
 order they are present in the structure.
 
 #### Account leaf
@@ -245,7 +245,7 @@ Legend:
   witnesses.
 - Significant bytes: how many bytes, of all bytes occupied by the operation, are significant (including operation
   number).
-- Hash: the result of SHA-256 function with operation's pubdata as input. Used for operation identification.
+- Hash: the result of the SHA-256 function with the operation's pubdata as input. Used for operation identification.
 
 ### 0. Rollup operation lifecycle
 
@@ -260,7 +260,7 @@ Legend:
 
 Critical circuit logic is described below in a python-like pseudocode for simplicity of comprehension. It describes
 invariants that should be preserved after rollup operation execution and account tree updates that should be performed
-if this invariants are true.
+if these invariants are true.
 
 There are two main invariant functions: `tree_invariants` and `pubdata_invariants`. Each predicate in these functions
 should evaluate to true.
@@ -268,10 +268,10 @@ should evaluate to true.
 Functions and data structures used in this pseudocode language:
 
 ```
-# Returns account in the account tree given its id; it always returns something, since account tree is filled by empty account by default.
+# Returns an account in the account tree given its ID; it always returns something, since the account tree is filled by an empty account by default.
 get_account_tree(account_id) -> Account
 
-# Unpacks packed amount or fee; these functions implicitly enforce the invariant that amount and fee is packable
+# Unpacks packed amount or fee; these functions implicitly enforce the invariant that amount and fee are packable
 unpack_amount(packed_amount) -> StateAmount
 unpack_fee(packed_fee) -> StateAmount
 
@@ -483,7 +483,7 @@ def pubdata_invariants():
 
 Transfers funds from Rollup account to a new Rollup account (dynamically assigns a free account number to a Rollup
 address). So, the "account creation" will be performed first, that is, the correspondence RollupAddress - AccountId is
-assigned. And then the usual funds' Transfer between Rollup accounts will occur.
+assigned. Then the usual funds Transfer between Rollup accounts will occur.
 
 #### Onchain operation
 
@@ -511,7 +511,7 @@ assigned. And then the usual funds' Transfer between Rollup accounts will occur.
 0200000004000000020000001ad3080910111213141516171819202122233425262800000003001200000000
 ```
 
-Reads as: transfer from account #4 token #2 amount in packed representation 0x0000001ad3 to account with address
+Reads as: transfer from account #4 token #2 amount in packed representation 0x0000001ad3 to account with the address
 0x0809101112131415161718192021222334252628 and id #3 for fee in packed representation 0x0012.
 
 #### User transaction
@@ -525,14 +525,14 @@ Same as [Transfer](#2-transfer)
 | Field           | Value/type | Description                                                 |
 | --------------- | ---------- | ----------------------------------------------------------- |
 | tx              | TransferTx | Signed transfer transaction defined above                   |
-| from_account_id | AccountId  | Unique id of the sender rollup account in the state tree    |
-| to_account_id   | AccountId  | Unique id of the recipient rollup account in the state tree |
+| from_account_id | AccountId  | Unique ID of the sender rollup account in the state tree    |
+| to_account_id   | AccountId  | Unique ID of the recipient rollup account in the state tree |
 
 #### Circuit constraints
 
 ```python
 # TransferToNewOp - Rollup operation described above
-# Block - block where this Rollup operation is executed
+# Block - the block where this Rollup operation is executed
 # OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
 
 from_account = get_account_tree(TransferToNewOp.from_account_id)
@@ -577,7 +577,7 @@ def pubdata_invariants():
 
 #### Description
 
-Withdraws funds from Rollup account to appropriate balance of the indicated Ethereum address.
+Withdraws funds from Rollup account to the appropriate balance of the indicated Ethereum address.
 
 #### Onchain operation
 
@@ -596,7 +596,7 @@ Withdraws funds from Rollup account to appropriate balance of the indicated Ethe
 | token        | 4        | TokenId     | Unique token identifier in the rollup                                                      |
 | full_amount  | 16       | StateAmount | Full amount of funds sent                                                                  |
 | packed_fee   | 2        | PackedFee   | Packed amount of fee paid                                                                  |
-| to_address   | 20       | EthAddress  | The address of Ethereum account, to the balance of which funds will be accrued (recipient) |
+| to_address   | 20       | EthAddress  | The address of the Ethereum account, to the balance of which funds will be accrued (recipient) |
 
 ##### Example
 
@@ -616,7 +616,7 @@ Reads as: transfer from account #4 token #2 amount 0x000000000000000002c68af0bb1
 | type         | `0xfc`      | Operation code                                                                                |
 | account_id   | AccountId   | Unique id of the sender rollup account in the state tree                                      |
 | from_address | ETHAddress  | Unique address of the rollup account from which funds will be withdrawn (sender)              |
-| to_address   | EthAddress  | The address of Ethereum account, to the balance of which the funds will be accrued(recipient) |
+| to_address   | EthAddress  | The address of the Ethereum account, to the balance of which the funds will be accrued(recipient) |
 | token        | TokenId     | Unique token identifier in the rollup                                                         |
 | amount       | StateAmount | Full amount of funds sent                                                                     |
 | fee          | PackedFee   | Packed amount of fee paid                                                                     |
@@ -683,7 +683,7 @@ Signed bytes: 0xfc0100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b
 
 ```python
 # WithdrawOp - Rollup operation described above
-# Block - block where this Rollup operation is executed
+# Block - the block where this Rollup operation is executed
 # OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
 
 account = get_tree_account(WithdrawOp.tx.account_id)
@@ -762,7 +762,7 @@ ethereum account with address 0x0809101112131415161718192021222334252628.
 | type         | `0xf5`     | Operation code                                                                                |
 | account_id   | AccountId  | Unique id of the sender rollup account in the state tree                                      |
 | from_address | ETHAddress | Unique address of the rollup account from which funds will be withdrawn (sender)              |
-| to_address   | EthAddress | The address of Ethereum account, to the balance of which the funds will be accrued(recipient) |
+| to_address   | EthAddress | The address of the Ethereum account, to the balance of which the funds will be accrued(recipient) |
 | token        | TokenId    | Unique token identifier in the rollup                                                         |
 | fee_token    | TokenId    | Fee token identifier in the rollup                                                            |
 | fee          | PackedFee  | Packed amount of fee paid                                                                     |
@@ -829,7 +829,7 @@ Signed bytes: 0xf50100001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b
 
 ```python
 # WithdrawNFTOp - Rollup operation described above
-# Block - block where this Rollup operation is executed
+# Block - the block where this Rollup operation is executed
 # OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
 
 account = get_tree_account(WithdrawNFTOp.tx.account_id)
@@ -896,7 +896,7 @@ Mints an NFT token inside Rollup
 090000000a0000000b0000000000000000000000000000000000000000000000000000000000000000000000000140000000
 ```
 
-Reads as: Mint NFT from account to recipient with content hash and pay packed fee in fee_token
+Reads as: Mint NFT from account to recipient with content hash and pay a packed fee in fee_token
 
 #### User transaction
 
@@ -907,7 +907,7 @@ Reads as: Mint NFT from account to recipient with content hash and pay packed fe
 | type         | `0xf6`     | Operation code                                                                                |
 | account_id   | AccountId  | Unique id of the sender rollup account in the state tree                                      |
 | from_address | ETHAddress | Unique address of the rollup account from which funds will be withdrawn (sender)              |
-| to_address   | EthAddress | The address of Ethereum account, to the balance of which the funds will be accrued(recipient) |
+| to_address   | EthAddress | The address of the Ethereum account, to the balance of which the funds will be accrued(recipient) |
 | token        | TokenId    | Unique token identifier in the rollup                                                         |
 | fee_token    | TokenId    | Fee token identifier in the rollup                                                            |
 | fee          | PackedFee  | Packed amount of fee paid                                                                     |
