@@ -11,4 +11,4 @@ Full reference on how to use the library can be found [here](https://docs.zksync
 
 ## Changelog
 
-The changelog of the zksync_rs is avaliable [here](/changelog/rust-sdk.md).
+The changelog of the zksync_rs is available [here](/changelog/rust-sdk.md).
