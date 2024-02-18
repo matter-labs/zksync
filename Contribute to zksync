@@ -1,0 +1,16 @@
+Contributing to zksync is an excellent way to support the project and help it grow. Here's how you can contribute:
+
+Fork the Repository: First, you'll need to fork the zksync repository on GitHub. This creates a copy of the repository under your own GitHub account.
+Clone the Repository: Now, clone the forked repository to your local machine using Git. This will allow you to make changes locally.
+Create a Branch: Before making any changes, create a new branch to work on. This is good practice because it keeps your changes isolated from the main branch.
+Make Changes: Now, make your changes to the code. This could be fixing a bug, adding a new feature, or improving the documentation.
+
+Commit Changes: Once you're happy with your changes, commit them to your local repository.
+
+Push Changes: Push your changes to your forked repository on GitHub.
+
+Create a Pull Request: Finally, go to the GitHub page of your forked repository and create a pull request. This will notify the maintainers of the zksync project that you have changes you'd like to contribute.
+
+Review and Merge: The maintainers will review your changes and, if everything looks good, merge them into the main branch of the zksync repository.
+
+Remember to follow the zksync contribution guidelines and coding standards. Also, be sure to test your changes thoroughly before submitting a pull request.
