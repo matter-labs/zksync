@@ -5,3 +5,4 @@ build/
 dist/
 volumes/
 .tslintrc.js
+.DS_Store
