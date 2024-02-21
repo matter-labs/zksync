@@ -38,6 +38,38 @@ The following guides for developers are available:
 - Development guide: [docs/development.md](docs/development.md).
 - Repository architecture overview: [docs/architecture.md](docs/architecture.md).
 
+## Project scripts 
+
+### build:zksync-sdk
+This script is used to build the zksync-sdk package within the monorepo. It executes the yarn zksync prepublish command, which likely triggers the build process for the zksync-sdk package.
+
+### build:crypto
+This script is responsible for building the crypto package within the monorepo. It executes the yarn crypto build command, which presumably initiates the build process for the crypto package.
+
+### build:reading-tool
+This script facilitates the build process for the reading-tool package within the monorepo. It executes the yarn reading-tool build command, which likely triggers the build process for the reading-tool package.
+
+### zksync
+This script provides a shortcut to execute commands specifically within the zksync workspace. It likely simplifies the process of running commands related to the zksync package.
+
+### crypto
+This script serves as a shortcut to execute commands within the zksync-crypto workspace. It simplifies the process of running commands related to the crypto package.
+
+### contracts
+This script acts as a shortcut to execute commands within the franklin-contracts workspace. It simplifies the process of running commands related to the contracts package.
+
+### ts-tests
+This script provides a convenient way to execute commands within the ts-tests workspace. It simplifies the process of running commands related to testing TypeScript code.
+
+### zk
+This script acts as a shortcut to execute commands within the zk workspace. It simplifies the process of running commands related to the zk package.
+
+### reading-tool
+This script serves as a shortcut to execute commands within the reading-tool workspace. It simplifies the process of running commands related to the reading-tool package.
+
+### api-docs
+This script provides a convenient way to execute commands within the api-docs workspace. It simplifies the process of generating or managing API documentation within the monorepo.
+
 ## Projects
 
 - [zkSync server](core/bin/server)
