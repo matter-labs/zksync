@@ -46,7 +46,7 @@ impl EthBatchSignData {
             Some(group) => group,
             None => return Vec::new(),
         };
-        // Check whether there're mutiple addresses in the batch, concatenate their
+        // Check whether there're multiple addresses in the batch, concatenate their
         // transaction messages with `From: {address}` separator.
         // Otherwise, process the whole group at once.
         match iter.peek() {

@@ -164,7 +164,7 @@ export function integerToFloat(integer: BigNumber, expBits: number, mantissaBits
         throw new Error('Integer is too big');
     }
 
-    // The algortihm is as follows: calculate minimal exponent
+    // The algorithm is as follows: calculate minimal exponent
     // such that integer <= max_mantissa * exponent_base ^ exponent,
     // then if this minimal exponent is 0 we can choose mantissa equals integer and exponent equals 0
     // else we need to check two variants:
@@ -212,7 +212,7 @@ export function integerToFloatUp(
         throw new Error('Integer is too big');
     }
 
-    // The algortihm is as follows: calculate minimal exponent
+    // The algorithm is as follows: calculate minimal exponent
     // such that integer <= max_mantissa * exponent_base ^ exponent,
     // then mantissa is calculated as integer divided by exponent_base ^ exponent and rounded up
     let exponent = 0;

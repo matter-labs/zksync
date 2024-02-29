@@ -28,7 +28,7 @@ export async function server() {
     // By the time this function is run the server is most likely not be running yet
     // However, it does not matter, since the only thing the function does is depositing
     // to the forced exit sender account, and server should be capable of recognizing
-    // priority operaitons that happened before it was booted
+    // priority operations that happened before it was booted
     prepareForcedExitRequestAccount();
 
     await utils.spawn('cargo run --bin zksync_server --release');

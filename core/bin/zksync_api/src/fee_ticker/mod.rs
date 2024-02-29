@@ -461,7 +461,7 @@ impl FeeTicker {
             // The total_gas_fee is multiplied by all of these multiples in the final calculation of the fee, so it is safe to return 0 here,
             // since the gas cost would be zero anyway.
 
-            // This would mean that the final subsidized fee is zero. However, this is a very rare ocasion
+            // This would mean that the final subsidized fee is zero. However, this is a very rare occasion
             Ratio::from(BigUint::zero())
         } else {
             &self.config.subsidy_cpk_price_usd / denom_part

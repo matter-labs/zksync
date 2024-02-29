@@ -38,7 +38,7 @@ describe(`No2FA tests`, () => {
 
     // The private key which won't require 2FA
     let zkPrivateKey: Uint8Array;
-    // The private key whcih will require 2FA
+    // The private key which will require 2FA
     let zkPrivateKeyWith2FA: Uint8Array;
 
     before('create tester and test wallets', async () => {
