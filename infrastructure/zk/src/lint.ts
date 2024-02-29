@@ -8,7 +8,7 @@ const LINT_COMMANDS = {
     sol: 'solhint',
     js: 'eslint',
     ts: 'eslint --ext ts'
-    // This is needed to silence typescipt. It is possible to create type
+    // This is needed to silence typescript. It is possible to create type
     // guards, but unfortunately they would have rather weird type, so
     // Record<string, string> is a better solution.
 } as Record<string, string>;

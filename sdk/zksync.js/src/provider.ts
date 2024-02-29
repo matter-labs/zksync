@@ -323,7 +323,7 @@ export class ETHProxy {
     }
 
     // This method is very helpful for those who have already fetched the
-    // default factory and want to avoid asynchorouns execution from now on
+    // default factory and want to avoid asynchronous execution from now on
     getCachedNFTDefaultFactory(): ZkSyncNFTFactory | undefined {
         return this.zksyncNFTFactory;
     }

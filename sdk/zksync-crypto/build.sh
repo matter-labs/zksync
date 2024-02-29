@@ -7,7 +7,7 @@ ASM=dist/zksync-crypto-bundler_asm.js
 
 which wasm-pack || cargo install --version 0.10.1 wasm-pack #Dec 16th update to wasm-pack (v0.10.2) breaks zk init
 
-# pack for bundler (!note this verion is used in the pkg.browser field)
+# pack for bundler (!note this version is used in the pkg.browser field)
 wasm-pack build --release --target=bundler --out-name=zksync-crypto-bundler --out-dir=dist
 # pack for browser
 wasm-pack build --release --target=web --out-name=zksync-crypto-web --out-dir=web-dist

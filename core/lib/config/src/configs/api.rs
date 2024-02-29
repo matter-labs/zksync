@@ -117,7 +117,7 @@ pub struct CommonApiConfig {
     /// The IPs which have their CPK (CREATE2) subsidized
     pub subsidized_ips: Vec<String>,
 
-    /// Maxiumum subsidized amout for current subsidy type scaled by SUBSIDY_USD_AMOUNTS_SCALE
+    /// Maximum subsidized amount for current subsidy type scaled by SUBSIDY_USD_AMOUNTS_SCALE
     pub max_subsidy_usd_scaled: u64,
 
     /// The name of current subsidy. It is needed to conveniently fetch historical data regarding subsidies for different partners

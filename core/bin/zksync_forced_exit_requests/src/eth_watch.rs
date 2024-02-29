@@ -334,7 +334,7 @@ where
 
         if Utc::now().sub(self.db_cleanup_interval) > self.last_db_cleanup_time {
             if let Err(err) = self.delete_expired().await {
-                // If an error during deletion occures we should be notified, however
+                // If an error during deletion occurs we should be notified, however
                 // it is not a reason to panic or revert the updates from the poll
                 log::warn!(
                     "An error occured when deleting the expired requests: {}",

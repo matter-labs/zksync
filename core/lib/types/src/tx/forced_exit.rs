@@ -92,7 +92,7 @@ impl ForcedExit {
     }
 
     /// Creates a signed transaction using private key and
-    /// checks for the transaction correcteness.
+    /// checks for the transaction correctness.
     pub fn new_signed(
         initiator_account_id: AccountId,
         target: Address,

@@ -406,7 +406,7 @@ fn mint_token_to_new_account() {
 }
 
 /// Check MINT NFT failure if recipient address does not exist
-/// does not correspond to accound_id
+/// does not correspond to account_id
 #[test]
 fn mint_already_created_nft() {
     let fee_token_id = TokenId(0);

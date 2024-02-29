@@ -393,7 +393,7 @@ pub fn calculate_empty_account_tree_hashes<E: RescueEngine>(
     rescue_params: &E::Params,
     tree_depth: usize,
 ) -> Vec<E::Fr> {
-    // manually calcualte empty subtree hashes
+    // manually calculate empty subtree hashes
     let empty_account_packed =
         zksync_crypto::circuit::account::empty_account_as_field_elements::<E>();
     calculate_empty_tree_hashes::<E>(rescue_params, tree_depth, &empty_account_packed)

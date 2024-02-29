@@ -240,7 +240,7 @@ fn nonce_mismatch() {
 }
 
 /// Check Transfer failure if account address
-/// does not correspond to accound_id
+/// does not correspond to account_id
 #[test]
 fn invalid_account_id() {
     let token_id = TokenId(0);

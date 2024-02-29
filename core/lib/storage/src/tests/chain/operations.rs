@@ -249,7 +249,7 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .await?
         .is_some());
 
-    // Replace failed tx with a successfull one.
+    // Replace failed tx with a successful one.
     executed_tx.success = true;
 
     OperationsSchema(&mut storage)
@@ -270,7 +270,7 @@ async fn transaction_resent(mut storage: StorageProcessor<'_>) -> QueryResult<()
         .await?;
     assert_eq!(block_txs.len(), 1);
 
-    // Now try to replace successfull transation wi`th a failed one.
+    // Now try to replace successful transation wi`th a failed one.
     executed_tx.success = false;
     OperationsSchema(&mut storage)
         .store_executed_tx(executed_tx.clone())
@@ -410,7 +410,7 @@ async fn remove_rejected_transactions(mut storage: StorageProcessor<'_>) -> Quer
         .await?;
     assert_eq!(count, 1);
     assert_eq!(count_tx_filters, 1);
-    // The last one is indeed succesful.
+    // The last one is indeed successful.
     let (count, _) = storage
         .chain()
         .stats_schema()

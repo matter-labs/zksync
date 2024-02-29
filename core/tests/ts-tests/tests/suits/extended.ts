@@ -185,7 +185,7 @@ describe(`Extended tests`, () => {
         // In this test, we run ForcedExit on the operator account.
         // It should not cause any problems and disrupt operator work, since operator doesn't use its L2 balance.
         // This is done after checking fees as the part of this workflow, and not at the very end of the whole
-        // test run (inclusing other suits).
+        // test run (including other suits).
         // Running after checking fees is required, since we don't update the running fee.
 
         // Operator account may not exist in L2, so we transfer some funds there to create it first.
