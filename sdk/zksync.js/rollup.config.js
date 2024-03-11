@@ -4,37 +4,38 @@ import json from '@rollup/plugin-json';
 import { terser } from 'rollup-plugin-terser';
 
 function resolveWithZksyncCryptoReplace(options) {
-    const plugin = resolve(options);
-    const defaultPluginResolveId = plugin.resolveId;
-    plugin.resolveId = async (source, importer) => {
-        const defaultResolveResult = await defaultPluginResolveId(source, importer);
-        if (source === 'zksync-crypto') {
-            defaultResolveResult.id = defaultResolveResult.id.replace('zksync-crypto-bundler', 'zksync-crypto-web');
-        }
-        return defaultResolveResult;
-    };
-    return plugin;
+  return resolve({
+    ...options,
+    resolveId: async (source, importer) => {
+      const defaultResolveResult = await options.resolveId(source, importer);
+      if (source === 'zksync-crypto') {
+        defaultResolveResult.id = defaultResolveResult.id.replace('zksync-crypto-bundler', 'zksync-crypto-web');
+      }
+      return defaultResolveResult;
+    },
+  });
 }
 
 export default [
-    {
-        input: 'build/index.js',
-        output: {
-            file: 'dist/main.js',
-            format: 'iife',
-            name: 'zksync',
-            globals: {
-                ethers: 'ethers'
-            }
-        },
-        external: ['ethers'],
-        plugins: [
-            resolveWithZksyncCryptoReplace({
-                browser: true
-            }),
-            commonjs(),
-            json(),
-            terser()
-        ]
-    }
+  {
+    input: 'build/index.js',
+    output: {
+      file: 'dist/main.js',
+      format: 'iife',
+      name: 'zksync',
+      globals: {
+        ethers: 'ethers',
+      },
+    },
+    external: ['ethers'],
+    plugins: [
+      resolveWithZksyncCryptoReplace({
+        browser: true,
+      }),
+      commonjs(),
+      json(),
+      terser(),
+    ],
+  },
 ];
+
