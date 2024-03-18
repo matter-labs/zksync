@@ -34,7 +34,7 @@ All notable changes to `zksync.js` will be documented in this file.
 - `SyncProvider` interface: common interface for API v0.2 `RestProvider` and JSON RPC `Provider`.
 - Types for REST API v0.2.
 
-- `RestProvider` class, that is used for queriing REST API v0.2.
+- `RestProvider` class, that is used for querying REST API v0.2.
 - `SyncProvider` interface: common interface for API v0.2 `RestProvider` and JSON RPC `Provider`.
 - Types for REST API v0.2.
 
