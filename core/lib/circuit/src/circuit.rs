@@ -4397,7 +4397,7 @@ pub fn check_account_data<E: RescueEngine, CS: ConstraintSystem<E>>(
 }
 
 /// Account tree state will be extended in the future, so for current balance tree we
-/// append emtpy hash to reserve place for the future tree before hashing.
+/// append empty hash to reserve place for the future tree before hashing.
 pub fn calc_account_state_tree_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     balance_root: &CircuitElement<E>,
