@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import {Command} from 'commander';
 import * as utils from '../utils';
 import * as env from '../env';
 import fs from 'fs';
@@ -6,7 +6,7 @@ import fs from 'fs';
 import * as insert from './insert';
 import * as update from './update';
 
-export { insert, update };
+export {insert, update};
 
 const SQL = () => `psql "${process.env.DATABASE_URL}" -c`;
 
@@ -53,6 +53,7 @@ export async function basicSetup() {
         // Remote database, we can't show the contents.
         console.log(`WARNING! Using prod db!`);
     }
+    console.log(process.env.DATABASE_URL);
     await utils.exec('diesel database setup');
     await utils.exec('diesel migration run');
     fs.unlinkSync('src/schema.rs.generated');
