@@ -1,4 +1,4 @@
-import {Command} from 'commander';
+import { Command } from 'commander';
 import * as utils from '../utils';
 import * as env from '../env';
 import fs from 'fs';
@@ -6,14 +6,14 @@ import fs from 'fs';
 import * as insert from './insert';
 import * as update from './update';
 
-export {insert, update};
+export { insert, update };
 
 const SQL = () => `psql "${process.env.DATABASE_URL}" -c`;
 
 export async function reset() {
     await utils.confirmAction();
     await wait();
-    await drop();
+    // await drop();
     await setup();
     await insert.contract();
     await insert.ethData();
