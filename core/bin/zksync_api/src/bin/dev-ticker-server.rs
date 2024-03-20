@@ -172,11 +172,13 @@ fn main_scope(sloppy_mode: bool) -> actix_web::Scope {
     let rinkeby_tokens = load_tokens("etc/tokens/rinkeby.json");
     let ropsten_tokens = load_tokens("etc/tokens/ropsten.json");
     let goerli_tokens = load_tokens("etc/tokens/goerli.json");
+    let sepolia = load_tokens("etc/tokens/sepolia.json");
     let data: Vec<TokenData> = localhost_tokens
         .into_iter()
         .chain(rinkeby_tokens)
         .chain(ropsten_tokens)
         .chain(goerli_tokens)
+        .chain(sepolia)
         .collect();
     if sloppy_mode {
         web::scope("")
