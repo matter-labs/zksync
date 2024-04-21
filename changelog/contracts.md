@@ -31,8 +31,8 @@ All notable changes to the contracts will be documented in this file.
 ### Added
 
 - `cutUpgradeNoticePeriodBySignature` a function for approving instant upgrade by security council members.
-- `Create2Factory.sol` - the smart contract that used to deploys targets.
-- New event `ApproveCutUpgradeNoticePeriod(address)` emitted after security council member approve upgrade.
+- `Create2Factory.sol` - the smart contract that is used to deploy targets.
+- New event `ApproveCutUpgradeNoticePeriod(address)` emitted after security council member approves upgrade.
 - Check that the deposited amount is non-zero.
 
 ### Changed
@@ -68,7 +68,7 @@ All notable changes to the contracts will be documented in this file.
 - `Swap` operation, which depending on the implementation may serve either order book or atomic swaps functionality.
 - The security council, which is able to shorten the upgrade notice period. More on that
   [here](https://medium.com/matter-labs/keeping-funds-safe-a-3-factor-approach-to-security-in-zksync-2-0-a70b0f53f360).
-- `RegeneisMultisig.sol` to handle submissions of the new root hash by the security council during the upgrade.
+- `RegenesisMultisig.sol` to handle submissions of the new root hash by the security council during the upgrade.
 - A special account with id `2**24 - 1`. It is used to ensure the correctness of the NFT data.
 
 ### Changed
@@ -163,7 +163,7 @@ All notable changes to the contracts will be documented in this file.
 ### Changed
 
 - Block revert interval is 0 hours.
-- `PRIORITY_EXPRIRATION_PERIOD` is reduced to 3 days.
+- `PRIORITY_EXPIRATION_PERIOD` is reduced to 3 days.
 - `UPGRADE_NOTICE_PERIOD` is increased to 8 days.
 
 ### Removed
