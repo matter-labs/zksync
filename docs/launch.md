@@ -74,14 +74,14 @@ zk server
 ```
 
 Server is configured using env files in `./etc/env` directory. After the first initialization,
-file `./etc/env/dev.env`will be created. By default, this file is copied from the `./etc/env/dev.env.example` template.
+file `./etc/env/dev.env` will be created. By default, this file is copied from the `./etc/env/dev.env.example` template.
 
 Server can produce block of different sizes, the list of available sizes is determined by
 the`SUPPORTED_BLOCK_CHUNKS_SIZES` environment variable. Block sizes which will actually be produced by the server can be
 configured using the `BLOCK_CHUNK_SIZES` environment variable.
 
 Note: for proof generation for large blocks requires a lot of resources and an average user machine is only capable
-ofcreating proofs for the smallest block sizes. As an alternative, a dummy-prover may be used for development
+of creating proofs for the smallest block sizes. As an alternative, a dummy-prover may be used for development
 (see`[development.md](https://hackmd.io/S7hTv1EwSpWu8VCReDmsBg)` for details).
 
 Run prover:
@@ -91,7 +91,7 @@ zk prover
 ```
 
 Make sure you have environment variables set right, you can check it by running: `zk env`. You should
-see `* dev` inoutput.
+see `* dev` in the output.
 
 ## Troubleshooting
 
