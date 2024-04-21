@@ -19,8 +19,6 @@ components, the logs will have the following format:
   API endpoints and their inputs/outputs are defined.
 - (`token_list_manager`): CLI for updating to new version of a previously saved list of trusted tokens.
 - (`loadnext`): Crate, a new implementation of the loadtest for zkSync.
-- (`api-docs`): tool for generating and testing API documentation. Docs are generated from a bunch of .apib files where
-  API endpoints and their inputs/outputs are defined.
 
 ### Fixed
 
@@ -36,7 +34,7 @@ components, the logs will have the following format:
 
 ### Added
 
-- (`read-variable`): tool for read private and public variables from contracts.
+- (`read-variable`): tool for reading private and public variables from contracts.
 - (`reading-tool`): tool for reading test config.
 - (`explorer`): column "Can be used to pay fees" for tokens.
 
