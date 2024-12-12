@@ -108,7 +108,7 @@ sudo apt-get install postgresql-client
 
 ## `Diesel` CLI
 
-Install `[diesel](https://diesel.rs/)` CLI (it is used for migrations management only):
+Install [diesel](https://diesel.rs/) CLI (it is used for migrations management only):
 
 ```bash
 cargo install diesel_cli --no-default-features --features postgres
