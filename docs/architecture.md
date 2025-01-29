@@ -81,7 +81,7 @@ This section provides an overview on folders / sub-projects that exist in this r
     - `/ts-tests`: Integration tests set implemented in TypeScript. Requires a running Server and Prover applications to
       operate.
 - `/docker`: Dockerfiles used for development of zkSync and for packaging zkSync for a production environment.
-- `/etc`: Configration files.
+- `/etc`: Configuration files.
   - `/env`: `.env` files that contain environment variables for different configuration of zkSync Server / Prover.
   - `/js`: Configuration files for JavaScript applications (such as Explorer).
   - `/tokens`: Configuration of supported Ethereum ERC-20 tokens.
