@@ -257,10 +257,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         self.tree_state.state.root_hash();
         let tree_cache = self.tree_state.state.get_balance_tree().get_internals();
         interactor
-            .update_tree_cache(
-                self.tree_state.block_number,
-                serde_json::to_string(&tree_cache).expect("failed to serialize tree cache"),
-            )
+            .update_tree_cache(self.tree_state.block_number, tree_cache.encode_bincode())
             .await;
     }
 

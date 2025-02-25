@@ -325,7 +325,7 @@ impl InMemoryStorageInteractor {
         None
     }
 
-    pub async fn update_tree_cache(&mut self, _block_number: BlockNumber, _tree_cache: String) {
+    pub async fn update_tree_cache(&mut self, _block_number: BlockNumber, _tree_cache: Vec<u8>) {
         // Inmemory storage doesn't support caching.
     }
 

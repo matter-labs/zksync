@@ -212,7 +212,7 @@ impl StorageInteractor<'_> {
     /// * `block_number` - The corresponding block number
     /// * `tree_cache` - Merkle tree cache
     ///
-    pub async fn update_tree_cache(&mut self, block_number: BlockNumber, tree_cache: String) {
+    pub async fn update_tree_cache(&mut self, block_number: BlockNumber, tree_cache: Vec<u8>) {
         storage_interact!(self.update_tree_cache(block_number, tree_cache))
     }
 

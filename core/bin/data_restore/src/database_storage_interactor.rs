@@ -403,7 +403,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
         }
     }
 
-    pub async fn update_tree_cache(&mut self, block_number: BlockNumber, tree_cache: String) {
+    pub async fn update_tree_cache(&mut self, block_number: BlockNumber, tree_cache: Vec<u8>) {
         let mut transaction = self
             .storage
             .start_transaction()
@@ -412,7 +412,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
 
         transaction
             .chain()
-            .tree_cache_schema_json()
+            .tree_cache_schema_bincode()
             .remove_old_account_tree_cache(block_number)
             .await
             .expect("Failed to remove old tree cache");
@@ -421,7 +421,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
         // since on conflict it does nothing.
         transaction
             .chain()
-            .tree_cache_schema_json()
+            .tree_cache_schema_bincode()
             .store_account_tree_cache(block_number, tree_cache)
             .await
             .expect("Failed to store new tree cache");
