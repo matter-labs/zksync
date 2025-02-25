@@ -372,7 +372,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
         let tree_cache = self
             .storage
             .chain()
-            .tree_cache_schema_json()
+            .tree_cache_schema_bincode()
             .get_account_tree_cache_block(last_block)
             .await
             .expect("Failed to query the database for the tree cache");

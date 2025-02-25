@@ -29,7 +29,7 @@ pub struct StoredTreeState {
 }
 
 pub struct CachedTreeState {
-    pub tree_cache: serde_json::Value,
+    pub tree_cache: Vec<u8>,
     pub account_map: AccountMap,
     pub current_block: Block,
     pub nfts: HashMap<TokenId, NFT>,
