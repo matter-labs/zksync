@@ -15,7 +15,7 @@ RUN curl -sL https://deb.nodesource.com/setup_14.x | bash
 RUN apt install nodejs -y
 RUN npm install -g yarn
 
-RUN cargo install diesel_cli --no-default-features --features postgres
+RUN cargo install diesel_cli@2.1.1 --no-default-features --features postgres
 
 # Copy workspace
 COPY . .
