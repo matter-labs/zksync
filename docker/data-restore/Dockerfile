@@ -1,4 +1,4 @@
-FROM rust:1.78-bookworm
+FROM rust:1.78
 WORKDIR /usr/src/zksync
 
 RUN apt update && apt install wget openssl libssl-dev pkg-config npm curl libpq5 libpq-dev lsb-release -y
@@ -33,4 +33,6 @@ ENV CONFIG_PATH=/usr/src/configs
 ENV PG_DUMP_PATH=/pg_restore
 USER root
 
+RUN chmod +x data-restore-entry.sh
+RUN chmod +x /usr/src/zksync/target/release/zksync_data_restore
 ENTRYPOINT ["data-restore-entry.sh"]
