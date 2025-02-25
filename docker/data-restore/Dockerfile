@@ -33,6 +33,6 @@ ENV CONFIG_PATH=/usr/src/configs
 ENV PG_DUMP_PATH=/pg_restore
 USER root
 
-RUN chmod +x data-restore-entry.sh
+RUN chmod +x /bin/data-restore-entry.sh
 RUN chmod +x /usr/src/zksync/target/release/zksync_data_restore
 ENTRYPOINT ["data-restore-entry.sh"]
