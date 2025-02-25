@@ -1,4 +1,4 @@
-FROM rust:1.67
+FROM rust:1.72-bookworm
 WORKDIR /usr/src/zksync
 
 RUN apt update && apt install wget openssl libssl-dev pkg-config npm curl libpq5 libpq-dev lsb-release -y
