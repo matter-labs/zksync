@@ -6,6 +6,7 @@ on:
     branches:
       - staging
       - trying
+      - plonk-refactoring-for-upcoming-deprecation
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

@@ -4,6 +4,8 @@ on:
     branches:
       - dev
       - hotfix/*
+      - plonk-refactoring-for-upcoming-deprecation
+
     tags:
       - hotfix-*
 
@@ -15,43 +17,38 @@ jobs:
     name: Build Docker Images
     runs-on: [matterlabs-ci-runner]
     steps:
-    - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
-    -
-      name: setup-env
-      run: |
-        echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
-        echo CI=1 >> $GITHUB_ENV
-        echo $(pwd)/bin >> $GITHUB_PATH
-        echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> $GITHUB_ENV
-        echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> .env
-    -
-      name: start-services
-      run: |
-        docker-compose -f docker-compose-runner.yml down
-        docker-compose -f docker-compose-runner.yml up -d zk postgres
-    -
-      name: init
-      run: |
-        ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
-        ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
-        ci_run git config --global --add safe.directory /usr/src/zksync
-        ci_run git config --global --add safe.directory /usr/src/zksync/sdk/binaryen
-        ci_run zk
-        ci_run zk run yarn
-        ci_run cp etc/tokens/{test,localhost}.json
-        ci_run zk run verify-keys unpack
-        ci_run zk db basic-setup
-    -
-      name: update-images
-      run: |
-        ci_run docker login -u ${{ secrets.DOCKERHUB_USER }} -p ${{ secrets.DOCKERHUB_TOKEN }}
-        ci_run gcloud auth configure-docker us-docker.pkg.dev -q
-        ci_run zk docker push rust
-    -
-      name: docker-down
-      if: always()
-      run: |
-        docker-compose -f docker-compose-runner.yml down
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
+      - name: setup-env
+        run: |
+          echo ZKSYNC_HOME=$(pwd) >> $GITHUB_ENV
+          echo CI=1 >> $GITHUB_ENV
+          echo $(pwd)/bin >> $GITHUB_PATH
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> $GITHUB_ENV
+          echo CARGO_NET_GIT_FETCH_WITH_CLI=true >> .env
+      - name: start-services
+        run: |
+          docker-compose -f docker-compose-runner.yml down
+          docker-compose -f docker-compose-runner.yml up -d zk postgres
+      - name: init
+        run: |
+          ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
+          ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
+          ci_run git config --global --add safe.directory /usr/src/zksync
+          ci_run git config --global --add safe.directory /usr/src/zksync/sdk/binaryen
+          ci_run zk
+          ci_run zk run yarn
+          ci_run cp etc/tokens/{test,localhost}.json
+          ci_run zk run verify-keys unpack
+          ci_run zk db basic-setup
+      - name: update-images
+        run: |
+          ci_run docker login -u ${{ secrets.DOCKERHUB_USER }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+          ci_run gcloud auth configure-docker us-docker.pkg.dev -q
+          ci_run zk docker push rust
+      - name: docker-down
+        if: always()
+        run: |
+          docker-compose -f docker-compose-runner.yml down
 
   setup:
     name: Setup
@@ -93,8 +90,7 @@ jobs:
     if: always() && !cancelled()
     steps:
       - uses: technote-space/workflow-conclusion-action@482bb0dbebad067b3b26ca4f6222c4023cf51ccf # v2
-      -
-        name: Notify to Mattermost (on incidents)
+      - name: Notify to Mattermost (on incidents)
         uses: tferreira/matterfy@releases/v1
         if: ${{ env.WORKFLOW_CONCLUSION == 'failure' }}
         with:
