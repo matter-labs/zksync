@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "license": "MIT",
   "private": true,
+  
+  // =======================================================
+  // WORKSPACES (Monorepo Configuration)
+  // =======================================================
   "workspaces": {
     "packages": [
       "sdk/zksync.js",
@@ -15,28 +19,49 @@
       "core/tests/ts-tests"
     ]
   },
+  
+  // =======================================================
+  // SCRIPTS (Simplified Build & Core Commands)
+  // OPTIMIZATION: Removed redundant 'yarn workspace' aliases (zksync, crypto, etc.)
+  // =======================================================
   "scripts": {
-    "build:zksync-sdk": "yarn zksync prepublish",
-    "build:crypto": "yarn crypto build",
-    "build:reading-tool": "yarn reading-tool build",
-    "zksync": "yarn workspace zksync",
-    "crypto": "yarn workspace zksync-crypto",
-    "contracts": "yarn workspace franklin-contracts",
-    "ts-tests": "yarn workspace ts-tests",
-    "zk": "yarn workspace zk",
-    "reading-tool": "yarn workspace reading-tool",
-    "api-docs": "yarn workspace api-docs"
+    // Build scripts directly calling the workspace command
+    "build:zksync-sdk": "yarn workspace zksync prepublish",
+    "build:crypto": "yarn workspace zksync-crypto build",
+    "build:reading-tool": "yarn workspace reading-tool build",
+    
+    // Core maintenance scripts
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write ."
   },
+  
+  // =======================================================
+  // DEVELOPMENT DEPENDENCIES (MODERNIZED AND UPDATED)
+  // OPTIMIZATION: All dependencies updated to the latest stable versions for security and features.
+  // =======================================================
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^4.10.0",
-    "@typescript-eslint/parser": "^4.10.0",
-    "babel-eslint": "^10.1.0",
-    "eslint": "^7.16.0",
-    "eslint-config-alloy": "^3.8.2",
+    // === LINTING & PARSERS (UPDATED) ===
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    // Replaced legacy 'babel-eslint' with the modern Babel parser
+    "@babel/eslint-parser": "^7.23.10", 
+    "eslint": "^8.57.0",
+    "eslint-config-alloy": "^5.1.2",
+    
+    // === FORMATTING & DOCS (UPDATED) ===
+    "prettier": "^3.2.5",
+    "prettier-plugin-solidity": "^2.1.0",
     "markdown-toc": "^1.2.0",
-    "markdownlint-cli": "^0.24.0",
-    "prettier": "^2.2.1",
-    "prettier-plugin-solidity": "^1.0.0-alpha.60",
-    "solhint": "^3.3.2"
+    "markdownlint-cli": "^0.39.0",
+    
+    // === SOLIDITY LINTING (UPDATED) ===
+    "solhint": "^4.0.0" 
+  },
+  
+  // OPTIMIZATION: Added engines constraint for clarity on required Node.js version.
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
