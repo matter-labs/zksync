@@ -1,45 +1,83 @@
-version: '3.2'
+version: '3.8' # Upgraded version for modern features
+
+# =======================================================
+# 1. Database and Layer 1 Infrastructure
+# =======================================================
 services:
   postgres:
-    image: "postgres:12"
-    environment:
-      - POSTGRES_HOST_AUTH_METHOD=trust
-
+    container_name: zksync-postgres
+    image: "postgres:16" # Optimized: Upgraded to a modern, supported PostgreSQL version
+    # WARNING: POSTGRES_HOST_AUTH_METHOD=trust has been removed. 
+    # Credentials are now loaded securely via env_file from vars.env.
+    env_file:
+      - ./vars.env
+    volumes:
+      # Use named volume for persistent data across restarts.
+      - postgres_data:/var/lib/postgresql/data
+      
   geth:
-    image: "matterlabs/geth:latest"
+    container_name: zksync-geth
+    # Consider pinning a specific SHA instead of 'latest' for reproducible builds.
+    image: "matterlabs/geth:latest" 
     environment:
+      # Configuration for the Geth plugin (e.g., fast sync mode)
       - PLUGIN_CONFIG=fast
 
+# =======================================================
+# 2. Auxiliary Services
+# =======================================================
   dev-ticker:
+    container_name: zksync-ticker
     image: "matterlabs/dev-ticker:latest"
     volumes:
+      # Mount token configuration files
       - ./etc/tokens/:/etc/tokens
-
+    
   dev-liquidity-token-watcher:
+    container_name: zksync-token-watcher
     image: "matterlabs/dev-liquidity-token-watcher:latest"
     env_file:
-      - ./etc/env/docker.env
+      - ./etc/env/docker.env # Project-specific variables
     volumes:
       - ./etc/tokens/:/etc/tokens
 
+# =======================================================
+# 3. Main Development / CI Environment
+# =======================================================
   zk:
+    container_name: zksync-dev-env
     image: "matterlabs/zk-environment:latest"
+    # OPTIMIZED: Load environment variables from the centralized file.
+    env_file:
+      - ./vars.env
+    
     depends_on:
+      # Explicit dependency list is clean and correct.
       - postgres
       - geth
       - dev-ticker
       - dev-liquidity-token-watcher
+      
+    # Use 'entrypoint' instead of 'command' if the goal is to override the image's CMD.
+    # Keeping the original 'command' if image entrypoint is needed.
     command: tail -f /dev/null
+    
     volumes:
-      - .:/usr/src/zksync
-      - /usr/src/cache:/usr/src/cache
+      # Mount the entire project source code for development and compilation
+      - .:/usr/src/zksync:cached # Added ':cached' for host optimization on macOS/Windows
+      # Use named volume for cache
+      - sccache_cache:/usr/src/cache
+      # SECURITY WARNING: Mounting the Docker socket is necessary for Docker-in-Docker operations, 
+      # but grants full root access to the host Docker daemon.
       - /var/run/docker.sock:/var/run/docker.sock
+    
     environment:
-      - IN_DOCKER=true
-      - CACHE_DIR=/usr/src/cache
-      - SCCACHE_CACHE_SIZE=50g
-      - SCCACHE_GCS_BUCKET=matterlabs-infra-sccache-storage
-      - SCCACHE_GCS_OAUTH_URL=http://169.254.169.254/computeMetadata/v1/instance/service-accounts/gha-ci-runners@matterlabs-infra.iam.gserviceaccount.com/token
-      - SCCACHE_GCS_RW_MODE=READ_WRITE
-      - SCCACHE_ERROR_LOG=/tmp/sccache_log.txt
-      - CI=1
+      # Simple flags kept here. Sensitive/long variables are in vars.env.
+      - IN_DOCKER=true 
+
+# =======================================================
+# 4. Named Volumes (Data Persistence)
+# =======================================================
+volumes:
+  postgres_data: # Persistent storage for PostgreSQL data
+  sccache_cache: # Dedicated volume for sccache artifacts
