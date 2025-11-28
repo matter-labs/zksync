@@ -308,10 +308,10 @@ impl Swap {
     }
 
     fn check_amounts(&self) -> Result<(), TransactionError> {
-        if self.amounts.0 > BigUint::from(u128::max_value()) {
+        if self.amounts.0 > BigUint::from(u128::MAX) {
             return Err(TransactionError::WrongAmount);
         }
-        if self.amounts.1 > BigUint::from(u128::max_value()) {
+        if self.amounts.1 > BigUint::from(u128::MAX) {
             return Err(TransactionError::WrongAmount);
         }
         if !is_token_amount_packable(&self.amounts.0) {

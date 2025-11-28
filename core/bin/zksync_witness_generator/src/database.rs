@@ -35,7 +35,7 @@ impl Database {
 
 #[async_trait::async_trait]
 impl DatabaseInterface for Database {
-    async fn acquire_connection(&self) -> anyhow::Result<StorageProcessor<'_>> {
+    async fn acquire_connection<'a>(&'a self) -> anyhow::Result<StorageProcessor<'a>> {
         let connection = self.db_pool.access_storage().await?;
 
         Ok(connection)

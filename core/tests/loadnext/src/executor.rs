@@ -294,7 +294,7 @@ impl Executor {
     fn transfer_amount(&self) -> u128 {
         let accounts_amount = self.config.accounts_amount;
         let account_balance = self.amount_to_deposit();
-        let for_fees = u64::max_value() >> 24; // Leave some spare funds on the master account for fees.
+        let for_fees = u64::MAX >> 24; // Leave some spare funds on the master account for fees.
         let funds_to_distribute = account_balance - u128::from(for_fees);
         funds_to_distribute / accounts_amount as u128
     }
@@ -448,7 +448,7 @@ impl Executor {
     /// Amount is chosen to be big enough to not worry about precisely calculating the remaining balances on accounts,
     /// but also to not be close to the supported limits in zkSync.
     fn amount_to_deposit(&self) -> u128 {
-        u128::max_value() >> 32
+        u128::MAX >> 32
     }
 
     /// Ensures that Ethereum transaction was successfully executed.

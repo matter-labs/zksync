@@ -245,7 +245,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
     ///
     /// 1. Pops all the available transactions from the `TxQueue` and sends them.
     /// 2. Sifts all the ongoing operations, filtering the completed ones and
-    ///   managing the rest (e.g. by sending a supplement txs for stuck operations).
+    ///    managing the rest (e.g. by sending a supplement txs for stuck operations).
     ///
     /// It returns ethereum block number for which these things were done.
     async fn proceed_next_operations(&mut self, last_used_block: u64) -> u64 {
@@ -429,7 +429,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             format!(
                 "<id {}; action: {}; blocks: {}-{}>",
                 id,
-                op.get_action_type().to_string(),
+                op.get_action_type(),
                 first_block,
                 last_block
             )

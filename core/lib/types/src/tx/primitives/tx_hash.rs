@@ -1,6 +1,7 @@
 use crate::H256;
 use parity_crypto::digest::sha256;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::{Display, Formatter};
 use std::{convert::TryInto, str::FromStr};
 use thiserror::Error;
 
@@ -48,9 +49,9 @@ impl AsRef<[u8]> for TxHash {
     }
 }
 
-impl ToString for TxHash {
-    fn to_string(&self) -> String {
-        format!("sync-tx:{}", hex::encode(self.data))
+impl Display for TxHash {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "sync-tx:{}", hex::encode(self.data))
     }
 }
 

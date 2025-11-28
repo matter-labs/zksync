@@ -35,7 +35,7 @@ pub struct TickerConfig {
     pub available_liquidity_seconds: u64,
     /// List of the tokens that are unconditionally acceptable for paying fee in.
     pub unconditionally_valid_tokens: Vec<Address>,
-    ///
+    /// Token market update time
     pub token_market_update_time: u64,
     /// Number of tickers for load balancing.
     pub number_of_ticker_actors: u8,

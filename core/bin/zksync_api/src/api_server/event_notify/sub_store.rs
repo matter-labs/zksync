@@ -62,7 +62,7 @@ where
             "{}/{}/{}/{}",
             ID::sub_type(),
             action_id.to_string(),
-            action_type.to_string(),
+            action_type,
             zksync_crypto::rand::random::<u64>()
         ))
     }

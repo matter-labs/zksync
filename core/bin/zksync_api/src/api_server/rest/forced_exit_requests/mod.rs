@@ -2,7 +2,6 @@
 use actix_web::{web, Scope};
 
 // Workspace uses
-pub use zksync_api_client::rest::client::{Client, ClientError};
 use zksync_config::ForcedExitRequestsConfig;
 use zksync_storage::ConnectionPool;
 

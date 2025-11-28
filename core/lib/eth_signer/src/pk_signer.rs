@@ -64,11 +64,14 @@ impl EthereumSigner for PrivateKeySigner {
         Ok(signed.raw_transaction.0)
     }
 
-    async fn sign_typed_data<S: EIP712TypedStructure + Sync>(
+    async fn sign_typed_data<S>(
         &self,
         eip712_domain: &Eip712Domain,
         typed_struct: &S,
-    ) -> Result<PackedEthSignature, SignerError> {
+    ) -> Result<PackedEthSignature, SignerError>
+    where
+        S: EIP712TypedStructure + Sync,
+    {
         PackedEthSignature::sign_typed_data(&self.private_key, eip712_domain, typed_struct)
             .map_err(|err| SignerError::SigningFailed(err.to_string()))
     }

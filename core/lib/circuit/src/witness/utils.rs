@@ -85,11 +85,11 @@ pub struct WitnessBuilder<'a> {
 
 impl<'a> WitnessBuilder<'a> {
     pub fn new(
-        account_tree: &'a mut CircuitAccountTree,
+        account_tree: &mut CircuitAccountTree,
         fee_account_id: AccountId,
         block_number: BlockNumber,
         timestamp: u64,
-    ) -> WitnessBuilder {
+    ) -> WitnessBuilder<'_> {
         let initial_root_hash = account_tree.root_hash();
         let initial_used_subtree_root_hash = get_used_subtree_root_hash(account_tree);
         WitnessBuilder {

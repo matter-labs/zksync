@@ -1,6 +1,7 @@
 use crate::block::Block;
 use ethabi::Token;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use zksync_basic_types::{BlockNumber, U256};
 use zksync_crypto::proof::EncodedAggregatedProof;
 
@@ -143,16 +144,17 @@ pub enum AggregatedActionType {
     PublishProofBlocksOnchain,
     ExecuteBlocks,
 }
-impl std::string::ToString for AggregatedActionType {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for AggregatedActionType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let res = match self {
             AggregatedActionType::CommitBlocks => "CommitBlocks".to_owned(),
             AggregatedActionType::CreateProofBlocks => "CreateProofBlocks".to_owned(),
             AggregatedActionType::PublishProofBlocksOnchain => {
                 "PublishProofBlocksOnchain".to_owned()
             }
             AggregatedActionType::ExecuteBlocks => "ExecuteBlocks".to_owned(),
-        }
+        };
+        write!(f, "{}", res)
     }
 }
 

@@ -14,7 +14,7 @@ impl Client {
     ) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("accounts/{}/{}", account_id_or_address, state_type),
+            format!("accounts/{}/{}", account_id_or_address, state_type),
         )
         .send()
         .await
@@ -23,7 +23,7 @@ impl Client {
     pub async fn account_full_info(&self, account_id_or_address: &str) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("accounts/{}", account_id_or_address),
+            format!("accounts/{}", account_id_or_address),
         )
         .send()
         .await
@@ -36,7 +36,7 @@ impl Client {
     ) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("accounts/{}/transactions", account_id_or_address),
+            format!("accounts/{}/transactions", account_id_or_address),
         )
         .query(&pagination_query)
         .send()
@@ -50,7 +50,7 @@ impl Client {
     ) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("accounts/{}/transactions/pending", account_id_or_address),
+            format!("accounts/{}/transactions/pending", account_id_or_address),
         )
         .query(pagination_query)
         .send()

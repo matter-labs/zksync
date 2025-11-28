@@ -6,7 +6,7 @@
 //! * Transfer cost determines maximum possible TPS of our network in larbe block size limit.
 //! * Cost of operations in the verify functions could stop block verification because of the block gas limit.
 //! * It is useful to calculate cost of the "griefing" attack.
-//! We don't take fees for deposit and full exit, but we must process them, so it is possible to spam us and force us to spend money.
+//!   We don't take fees for deposit and full exit, but we must process them, so it is possible to spam us and force us to spend money.
 
 use crate::eth_account::EthereumAccount;
 use crate::external_commands::{deploy_contracts, get_test_accounts};

@@ -8,7 +8,7 @@ use zksync_types::{tx::TxHash, BlockNumber};
 
 impl Client {
     pub async fn block_by_position(&self, block_position: &str) -> Result<Response> {
-        self.get_with_scope(super::API_V02_SCOPE, &format!("blocks/{}", block_position))
+        self.get_with_scope(super::API_V02_SCOPE, format!("blocks/{}", block_position))
             .send()
             .await
     }
@@ -16,7 +16,7 @@ impl Client {
     pub async fn transaction_in_block(&self, block_number: u32, tx_index: u32) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("blocks/{}/transactions/{}", block_number, tx_index),
+            format!("blocks/{}/transactions/{}", block_number, tx_index),
         )
         .send()
         .await
@@ -29,7 +29,7 @@ impl Client {
     ) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("blocks/{}/transactions", block_position),
+            format!("blocks/{}/transactions", block_position),
         )
         .query(&pagination_query)
         .send()

@@ -454,17 +454,17 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for ZkSyncCircuit<'a, E> {
 
         {
             for (i, (before, after)) in validator_non_processable_tokens_audit_before_fees
-                    .iter()
-                    .zip(validator_non_processable_tokens_audit_after_fees.iter())
-                    .enumerate()
-                {
-                    cs.enforce(
-                        || format!("non processable audit element unchanged {}", i),
-                        |lc| lc + before.get_variable(),
-                        |lc| lc + CS::one(),
-                        |lc| lc + after.get_variable(),
-                    );
-                }
+                .iter()
+                .zip(validator_non_processable_tokens_audit_after_fees.iter())
+                .enumerate()
+            {
+                cs.enforce(
+                    || format!("non processable audit element unchanged {}", i),
+                    |lc| lc + before.get_variable(),
+                    |lc| lc + CS::one(),
+                    |lc| lc + after.get_variable(),
+                );
+            }
         }
 
         let new_operator_balance_root = calculate_validator_root_from_processable_values(
@@ -2142,10 +2142,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
 
         let is_valid_not_first = multi_and(
             cs.namespace(|| "is_valid_not_first"),
-            &[
-                tx_valid.clone(),
-                is_first_chunk.not(),
-            ],
+            &[tx_valid.clone(), is_first_chunk.not()],
         )?;
 
         let tx_valid = multi_or(
@@ -2188,7 +2185,7 @@ impl<'a, E: RescueEngine + JubjubEngine> ZkSyncCircuit<'a, E> {
         global_variables: &CircuitGlobalVariables<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
         op_data: &AllocatedOperationData<E>,
-        pubdata_holder: &mut Vec<AllocatedNum<E>>,
+        pubdata_holder: &mut [AllocatedNum<E>],
     ) -> Result<Boolean, SynthesisError> {
         assert_eq!(
             pubdata_holder.len(),
@@ -4965,7 +4962,7 @@ fn no_nonce_overflow<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(Boolean::from(Expression::equals(
         cs.namespace(|| "is nonce at max"),
         nonce,
-        Expression::constant::<CS>(E::Fr::from_str(&std::u32::MAX.to_string()).unwrap()),
+        Expression::constant::<CS>(E::Fr::from_str(&u32::MAX.to_string()).unwrap()),
     )?)
     .not())
 }

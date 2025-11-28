@@ -87,6 +87,7 @@ impl Handler<RegisterServerHandle> for ServerMonitor {
 impl Handler<Shutdown> for ServerMonitor {
     type Result = ();
 
+    #[allow(clippy::mutable_key_type)]
     fn handle(&mut self, _msg: Shutdown, ctx: &mut Self::Context) {
         // Since actix can't gracefully shutdown the WebSocket
         // server on its own, we have to send this message to

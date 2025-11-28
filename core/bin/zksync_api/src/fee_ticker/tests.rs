@@ -10,10 +10,7 @@ use zksync_utils::{
     ratio_to_big_decimal, ratio_to_scaled_u64, scaled_u64_to_ratio, UnsignedRatioSerializeAsDecimal,
 };
 
-use crate::fee_ticker::{
-    ticker_api::TokenPriceAPI,
-    validator::{cache::TokenInMemoryCache, FeeTokenValidator},
-};
+use crate::fee_ticker::validator::{cache::TokenInMemoryCache, FeeTokenValidator};
 
 use super::*;
 use crate::fee_ticker::ticker_info::BlocksInFutureAggregatedOperations;
@@ -117,15 +114,6 @@ pub fn get_test_ticker_config() -> TickerConfig {
     }
 }
 
-struct MockApiProvider;
-
-#[async_trait]
-impl FeeTickerAPI for MockApiProvider {
-    async fn keep_price_updated(self) {
-        // Just do nothing
-    }
-}
-
 #[derive(Clone)]
 struct MockTickerInfo {
     pub future_blocks: BlocksInFutureAggregatedOperations,
@@ -202,15 +190,6 @@ impl FeeTickerInfo for MockTickerInfo {
 
 fn format_with_dot(num: &Ratio<BigUint>, precision: usize) -> String {
     UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(num, precision)
-}
-
-struct ErrorTickerApi;
-
-#[async_trait::async_trait]
-impl TokenPriceAPI for ErrorTickerApi {
-    async fn get_price(&self, _token: &Token) -> Result<TokenPrice, PriceError> {
-        Err(PriceError::token_not_found("Wrong token"))
-    }
 }
 
 fn get_normal_and_subsidy_fee(

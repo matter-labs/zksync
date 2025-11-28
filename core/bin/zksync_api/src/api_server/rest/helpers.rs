@@ -35,7 +35,7 @@ pub fn deposit_op_to_tx_by_hash(
             // As the time of creation is indefinite, we always will provide the current time.
             let current_time = chrono::Utc::now();
             let naive_current_time =
-                chrono::NaiveDateTime::from_timestamp(current_time.timestamp(), 0);
+                chrono::DateTime::from_timestamp(current_time.timestamp(), 0).unwrap();
 
             // Account ID may not exist for depositing ops, so it'll be `null`.
             let account_id: Option<u32> = None;

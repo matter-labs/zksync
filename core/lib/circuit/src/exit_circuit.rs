@@ -114,7 +114,7 @@ impl<'a, E: RescueEngine> Circuit<E> for ZkSyncExitCircuit<'a, E> {
             self.params,
         )?;
 
-        let allocated_roots = vec![
+        let allocated_roots = [
             state_root.clone(),
             state_root_special_branch,
             state_root_creator_branch,

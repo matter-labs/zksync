@@ -19,8 +19,7 @@ use zksync_utils::ZeroPrefixHexSerde;
 /// Library that we use for signature verification (written for bitcoin) expects v = recovery_id
 ///
 /// That is why:
-/// 1) when we create this structure by deserialization of message produced by user
-/// we subtract 27 from v in `ETHSignature` if necessary and store it in the `ETHSignature` structure this way.
+/// 1) when we create this structure by deserialization of message produced by user we subtract 27 from v in `ETHSignature` if necessary and store it in the `ETHSignature` structure this way.
 /// 2) When we serialize/create this structure we add 27 to v in `ETHSignature`.
 ///
 /// This way when we have methods that consumes &self we can be sure that ETHSignature::recover_signer works

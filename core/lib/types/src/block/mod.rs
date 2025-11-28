@@ -89,7 +89,6 @@ pub enum ExecutedOperations {
 
 impl ExecutedOperations {
     /// Returns Id of the account affected by the operation.
-
     pub fn token_id(&self) -> TokenId {
         match self {
             ExecutedOperations::Tx(tx) => tx.signed_tx.tx.token_id(),
@@ -490,7 +489,7 @@ impl Block {
     }
 
     pub fn timestamp_utc(&self) -> DateTime<Utc> {
-        Utc.timestamp(self.timestamp as i64, 0)
+        Utc.timestamp_opt(self.timestamp as i64, 0).unwrap()
     }
 
     pub fn elapsed(&self) -> Duration {

@@ -127,7 +127,7 @@ fn smt_root_hash(b: &mut Bencher<'_>, size: u32) {
         tree.insert(id, account.clone());
     }
 
-    let setup = || (tree.clone());
+    let setup = || tree.clone();
 
     b.iter_batched_ref(
         setup,
@@ -158,7 +158,7 @@ fn smt_root_hash_cached(b: &mut Bencher<'_>, size: u32) {
         }
     }
 
-    let setup = || (tree.clone());
+    let setup = || tree.clone();
 
     b.iter_batched_ref(
         setup,
@@ -181,7 +181,7 @@ fn smt_drop(b: &mut Bencher<'_>, size: u32) {
     }
     tree.root_hash();
 
-    let setup = || (tree.clone());
+    let setup = || tree.clone();
 
     b.iter_batched(
         setup,

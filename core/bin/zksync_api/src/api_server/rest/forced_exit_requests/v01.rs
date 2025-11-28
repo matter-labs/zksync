@@ -244,6 +244,27 @@ pub fn api_scope(
     }
 }
 
+fn warn_err<T: std::fmt::Display>(err: T) -> T {
+    vlog::warn!("Internal Server Error: '{}';", err);
+    err
+}
+
+// Checks if the id exceeds half of the address space
+// If it exceeds the half at all the alert should be triggerred
+// since it it a sign of a possible DoS attack
+pub fn check_address_space_overflow(id: i64, digits_in_id: u8) {
+    let address_space = 10_i64.saturating_pow(digits_in_id as u32);
+
+    let exceeding_rate = id.saturating_sub(address_space / 2);
+    // Need this for metrics
+    let exceeding_rate: u64 = exceeding_rate.max(0).try_into().unwrap();
+
+    metrics::histogram!(
+        "forced_exit_requests.address_space_overflow",
+        exceeding_rate as f64
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use std::ops::Mul;
@@ -456,25 +477,4 @@ mod tests {
         server.stop().await;
         Ok(())
     }
-}
-
-fn warn_err<T: std::fmt::Display>(err: T) -> T {
-    vlog::warn!("Internal Server Error: '{}';", err);
-    err
-}
-
-// Checks if the id exceeds half of the address space
-// If it exceeds the half at all the alert should be triggerred
-// since it it a sign of a possible DoS attack
-pub fn check_address_space_overflow(id: i64, digits_in_id: u8) {
-    let address_space = 10_i64.saturating_pow(digits_in_id as u32);
-
-    let exceeding_rate = id.saturating_sub(address_space / 2);
-    // Need this for metrics
-    let exceeding_rate: u64 = exceeding_rate.max(0).try_into().unwrap();
-
-    metrics::histogram!(
-        "forced_exit_requests.address_space_overflow",
-        exceeding_rate as f64
-    );
 }

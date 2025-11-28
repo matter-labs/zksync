@@ -136,13 +136,7 @@ impl TokenCacheWrapper {
                 TokenDBCache::get_all_tokens(&mut cache.pool.access_storage().await?).await
             }
             #[cfg(test)]
-            Self::Memory(cache) => Ok(cache
-                .tokens
-                .lock()
-                .await
-                .iter()
-                .map(|(_k, v)| v.clone())
-                .collect()),
+            Self::Memory(cache) => Ok(cache.tokens.lock().await.values().cloned().collect()),
         }
     }
 }

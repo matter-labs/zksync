@@ -1,5 +1,3 @@
-//!
-
 use zksync_circuit::witness::WitnessBuilder;
 use zksync_config::ChainConfig;
 use zksync_crypto::circuit::CircuitAccountTree;

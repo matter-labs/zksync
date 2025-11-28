@@ -87,11 +87,14 @@ impl EthereumSigner for JsonRpcSigner {
 
     /// Signs typed struct using ethereum private key according to the EIP-712 signature standard.
     /// Result of this function is the equivalent of RPC calling `eth_signTypedData`.
-    async fn sign_typed_data<S: EIP712TypedStructure + Sync>(
+    async fn sign_typed_data<S>(
         &self,
         eip712_domain: &Eip712Domain,
         typed_struct: &S,
-    ) -> Result<PackedEthSignature, SignerError> {
+    ) -> Result<PackedEthSignature, SignerError>
+    where
+        S: EIP712TypedStructure + Sync,
+    {
         let signature: PackedEthSignature = {
             let message =
                 JsonRpcRequest::sign_typed_data(self.address()?, eip712_domain, typed_struct);

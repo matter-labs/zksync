@@ -9,7 +9,6 @@ members = [
     "core/bin/block_revert",
     "core/bin/remove_proofs",
     "core/bin/tx_count_migration",
-
     # Server micro-services
     "core/bin/zksync_api",
     "core/bin/zksync_core",
@@ -17,7 +16,6 @@ members = [
     "core/bin/zksync_event_listener",
     "core/bin/zksync_witness_generator",
     "core/bin/zksync_forced_exit_requests",
-
     # Libraries
     "core/lib/token_db_cache",
     "core/lib/circuit",
@@ -40,13 +38,11 @@ members = [
     "core/lib/notifier",
     "core/lib/api_types",
     "core/lib/balancer",
-
     # Test infrastructure
     "core/tests/flamegraph_target",
     "core/tests/test_account",
     "core/tests/testkit",
     "core/tests/loadnext",
-
     # SDK section
     "sdk/zksync-rs"
 ]

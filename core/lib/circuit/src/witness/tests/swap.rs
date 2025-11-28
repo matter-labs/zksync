@@ -545,7 +545,7 @@ fn test_swap_incompatible_orders() {
 #[test]
 #[ignore]
 fn test_swap_failure() {
-    let mut test_swaps = vec![
+    let mut test_swaps = [
         // Not enough balance
         TestSwap {
             accounts: (1, 3),

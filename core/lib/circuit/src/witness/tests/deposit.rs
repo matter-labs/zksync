@@ -81,10 +81,10 @@ fn test_deposit_zero_address() {
 fn test_deposit_existing_account() {
     // Data for building a test vector: tuples of (token_id, amount).
     let test_vector = vec![
-        (0, 1),             // Small deposit in ETH.
-        (0, 0),             // 0 deposit in ETH.
-        (0, std::u64::MAX), // Big amount in ETH.
-        (2, 1),             // Non-ETH token.
+        (0, 1),        // Small deposit in ETH.
+        (0, 0),        // 0 deposit in ETH.
+        (0, u64::MAX), // Big amount in ETH.
+        (2, 1),        // Non-ETH token.
     ];
 
     for (token_id, token_amount) in test_vector {

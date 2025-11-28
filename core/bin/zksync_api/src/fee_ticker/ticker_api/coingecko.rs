@@ -1,7 +1,7 @@
 use super::{TokenPriceAPI, REQUEST_TIMEOUT};
 use crate::fee_ticker::ticker_api::PriceError;
 use async_trait::async_trait;
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::DateTime;
 use num::rational::Ratio;
 use num::BigUint;
 use reqwest::Url;
@@ -143,11 +143,11 @@ impl TokenPriceAPI for CoinGeckoAPI {
         let usd_price = usd_price
             .ok_or_else(|| PriceError::api_error("CoinGecko returned empty price data"))?;
 
-        let naive_last_updated = NaiveDateTime::from_timestamp(
+        let last_updated = DateTime::from_timestamp(
             last_updated_timestamp_ms / 1_000,                      // ms to s
             (last_updated_timestamp_ms % 1_000) as u32 * 1_000_000, // ms to ns
-        );
-        let last_updated = DateTime::<Utc>::from_utc(naive_last_updated, Utc);
+        )
+        .expect("failed to convert timestamp");
         metrics::histogram!("ticker.coingecko.request", start.elapsed());
         Ok(TokenPrice {
             usd_price,

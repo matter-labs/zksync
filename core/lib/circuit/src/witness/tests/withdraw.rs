@@ -24,11 +24,11 @@ use crate::witness::{
 fn test_withdraw() {
     // Test vector of (initial_balance, transfer_amount, fee_amount).
     let test_vector = vec![
-        (10u64, 7u64, 3u64),       // Basic transfer
-        (0, 0, 0),                 // Zero transfer
-        (std::u64::MAX, 1, 1),     // Small transfer from rich account,
-        (std::u64::MAX, 10000, 1), // Big transfer from rich account (too big values can't be used, since they're not packable),
-        (std::u64::MAX, 1, 10000), // Very big fee
+        (10u64, 7u64, 3u64),  // Basic transfer
+        (0, 0, 0),            // Zero transfer
+        (u64::MAX, 1, 1),     // Small transfer from rich account,
+        (u64::MAX, 10000, 1), // Big transfer from rich account (too big values can't be used, since they're not packable),
+        (u64::MAX, 1, 10000), // Very big fee
     ];
 
     for (initial_balance, transfer_amount, fee_amount) in test_vector {
@@ -76,11 +76,11 @@ fn test_withdraw() {
 fn test_withdraw_old_signature() {
     // Test vector of (initial_balance, transfer_amount, fee_amount).
     let test_vector = vec![
-        (10u64, 7u64, 3u64),       // Basic transfer
-        (0, 0, 0),                 // Zero transfer
-        (std::u64::MAX, 1, 1),     // Small transfer from rich account,
-        (std::u64::MAX, 10000, 1), // Big transfer from rich account (too big values can't be used, since they're not packable),
-        (std::u64::MAX, 1, 10000), // Very big fee
+        (10u64, 7u64, 3u64),  // Basic transfer
+        (0, 0, 0),            // Zero transfer
+        (u64::MAX, 1, 1),     // Small transfer from rich account,
+        (u64::MAX, 10000, 1), // Big transfer from rich account (too big values can't be used, since they're not packable),
+        (u64::MAX, 1, 10000), // Very big fee
     ];
 
     for (initial_balance, transfer_amount, fee_amount) in test_vector {

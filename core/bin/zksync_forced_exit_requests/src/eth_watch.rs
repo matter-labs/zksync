@@ -199,7 +199,7 @@ where
             mode: WatcherMode::Working,
             db_cleanup_interval,
             // Zero timestamp, has never deleted anything
-            last_db_cleanup_time: Utc.timestamp(0, 0),
+            last_db_cleanup_time: Utc.timestamp_opt(0, 0).unwrap(),
         }
     }
 

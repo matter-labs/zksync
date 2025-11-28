@@ -29,18 +29,15 @@ impl Client {
     }
 
     pub async fn tx_status(&self, tx_hash: TxHash) -> Result<Response> {
-        self.get_with_scope(
-            super::API_V02_SCOPE,
-            &format!("transactions/{}", tx_hash.to_string()),
-        )
-        .send()
-        .await
+        self.get_with_scope(super::API_V02_SCOPE, format!("transactions/{}", tx_hash))
+            .send()
+            .await
     }
 
     pub async fn tx_data(&self, tx_hash: TxHash) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("transactions/{}/data", tx_hash.to_string()),
+            format!("transactions/{}/data", tx_hash),
         )
         .send()
         .await
@@ -49,7 +46,7 @@ impl Client {
     pub async fn get_batch(&self, batch_hash: TxHash) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("transactions/batches/{}", batch_hash.to_string()),
+            format!("transactions/batches/{}", batch_hash),
         )
         .send()
         .await

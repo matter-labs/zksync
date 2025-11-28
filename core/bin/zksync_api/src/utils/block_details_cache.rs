@@ -17,7 +17,7 @@ impl BlockDetailsCache {
         Self(AsyncLruCache::new(capacity))
     }
 
-    pub async fn get<'a>(
+    pub async fn get(
         &self,
         pool: &ConnectionPool,
         block_number: BlockNumber,

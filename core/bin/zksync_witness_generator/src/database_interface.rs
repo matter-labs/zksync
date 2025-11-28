@@ -20,7 +20,7 @@ use zksync_types::{
 #[async_trait::async_trait]
 pub trait DatabaseInterface: Send + Sync + Clone + 'static {
     /// Returns connection to the database.
-    async fn acquire_connection(&self) -> anyhow::Result<StorageProcessor<'_>>;
+    async fn acquire_connection<'a>(&'a self) -> anyhow::Result<StorageProcessor<'a>>;
 
     /// Returns the block number with the largest last block.
     async fn load_last_block_prover_job_queue(

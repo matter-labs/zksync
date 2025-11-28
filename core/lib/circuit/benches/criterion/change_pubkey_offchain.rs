@@ -26,7 +26,7 @@ fn change_pubkey_offchain_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usi
     };
     let (_, circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
 
-    let setup = || (circuit_account_tree.clone());
+    let setup = || circuit_account_tree.clone();
 
     b.iter_with_setup(setup, |mut circuit_account_tree| {
         ChangePubkeyOffChainWitnessBn256::apply_tx(&mut circuit_account_tree, &change_pkhash_op);
@@ -78,7 +78,7 @@ fn change_pubkey_offchain_calculate_operations(b: &mut Bencher<'_>) {
         ChangePubkeyOffChainWitnessBn256::apply_tx(&mut circuit_account_tree, &change_pkhash_op);
     let input = SigDataInput::from_change_pubkey_op(&change_pkhash_op)
         .expect("SigDataInput creation failed");
-    let setup = || (input.clone());
+    let setup = || input.clone();
     b.iter_with_setup(setup, |input| {
         let _ops = black_box(witness.calculate_operations(input));
     });

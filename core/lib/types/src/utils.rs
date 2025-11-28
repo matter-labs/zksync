@@ -74,7 +74,7 @@ pub mod h256_as_vec {
         let mut val = Vec::deserialize(deserializer)?;
         if let Some(padding_size) = expected_size.checked_sub(val.len()) {
             if padding_size > 0 {
-                val = iter::repeat(0).take(padding_size).chain(val).collect();
+                val = iter::repeat_n(0, padding_size).chain(val).collect();
             }
         }
 

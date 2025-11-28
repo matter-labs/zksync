@@ -167,7 +167,7 @@ pub fn bench_primitives(c: &mut Criterion) {
     let mut group = c.benchmark_group("bench_circuit_account_get_bits_le");
     group.bench_function("default account", bench_circuit_account_get_bits_le_default);
     for n_balances in [0, 10, 100, 1000] {
-        group.bench_function(&format!("n_balances: {}", n_balances), |b| {
+        group.bench_function(format!("n_balances: {}", n_balances), |b| {
             bench_circuit_account_get_bits_le(b, n_balances)
         });
     }

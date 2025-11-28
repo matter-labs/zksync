@@ -30,5 +30,5 @@ metrics-util = "0.10"
 
 [dev-dependencies]
 zksync_utils = { path = "../../lib/utils", version = "1.0" }
-chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
+chrono = { version = "0.4", features = ["serde"] }
 zksync_crypto = { path = "../../lib/crypto", version = "1.0" }

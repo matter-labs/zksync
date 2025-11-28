@@ -27,7 +27,6 @@ pub fn balance_tree_depth() -> usize {
 }
 
 /// Tokens settings
-
 /// Number of supported tokens.
 #[inline(always)]
 pub const fn total_fungible_tokens() -> usize {
@@ -58,8 +57,8 @@ pub fn max_processable_token() -> TokenId {
 
     TokenId((num - 1) as u32)
 }
-/// NFT settings
 
+/// NFT settings
 /// Special token id, which enforce unique pair of creator account id and serial id for generating unique address for token.
 /// Where serial id is balance for this special token
 /// We must use i32 here, because we store data in Postgres, and we have limitation in Postgres about i32. Migration to i64 in database would be really difficult, however i32 is enough for our purposes

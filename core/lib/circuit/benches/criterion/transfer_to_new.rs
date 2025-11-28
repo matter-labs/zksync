@@ -35,7 +35,7 @@ fn transfer_to_new_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
     };
     let (_, circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
 
-    let setup = || (circuit_account_tree.clone());
+    let setup = || circuit_account_tree.clone();
     b.iter_with_setup(setup, |mut circuit_account_tree| {
         TransferToNewWitnessBn256::apply_tx(&mut circuit_account_tree, &transfer_op);
     });
@@ -98,7 +98,7 @@ fn transfer_to_new_calculate_operations(b: &mut Bencher<'_>) {
     let witness = TransferToNewWitnessBn256::apply_tx(&mut circuit_account_tree, &transfer_op);
     let input =
         SigDataInput::from_transfer_to_new_op(&transfer_op).expect("SigDataInput creation failed");
-    let setup = || (input.clone());
+    let setup = || input.clone();
     b.iter_with_setup(setup, |input| {
         let _ops = black_box(witness.calculate_operations(input));
     });
