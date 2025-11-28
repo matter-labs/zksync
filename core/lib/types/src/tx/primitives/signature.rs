@@ -110,8 +110,8 @@ pub enum DeserializeError {
 impl Default for TxSignature {
     fn default() -> Self {
         Self {
-            pub_key: PackedPublicKey::deserialize_packed(&[0; 32]).unwrap(),
-            signature: PackedSignature::deserialize_packed(&[0; 64]).unwrap(),
+            pub_key: PackedPublicKey::default(),
+            signature: PackedSignature::default(),
         }
     }
 }
