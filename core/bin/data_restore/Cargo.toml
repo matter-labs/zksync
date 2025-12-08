@@ -28,6 +28,7 @@ structopt = "0.3.20"
 chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
+rocksdb = "0.23.0"
 
 zksync_state = { path = "../../lib/state", version = "1.0" }
 zksync_types = { path = "../../lib/types", version = "1.0" }

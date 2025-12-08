@@ -46,4 +46,13 @@ impl RollupOpsBlock {
             .rollup_ops_blocks_from_bytes(input_data)?;
         Ok(blocks)
     }
+
+    pub fn from_input_data(
+        contract_version: ZkSyncContractVersion,
+        input_data: Vec<u8>,
+    ) -> anyhow::Result<Vec<Self>> {
+        let blocks: Vec<RollupOpsBlock> =
+            contract_version.rollup_ops_blocks_from_bytes(input_data)?;
+        Ok(blocks)
+    }
 }

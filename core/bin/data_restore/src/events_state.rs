@@ -32,6 +32,8 @@ pub struct EventsState {
     /// fetching fields which are not present in public data
     /// such as Ethereum transaction hash.
     pub priority_op_data: HashMap<SerialId, PriorityOp>,
+    pub ignore_priority_ops: bool,
+    pub latest_eth_block: u64,
 }
 
 pub struct NewEvents<'a, T: Transport + Debug> {
@@ -50,7 +52,9 @@ impl std::default::Default for EventsState {
             committed_events: Vec::new(),
             verified_events: Vec::new(),
             last_watched_eth_block_number: 0,
+            latest_eth_block: 0,
             priority_op_data: HashMap::new(),
+            ignore_priority_ops: false,
         }
     }
 }
@@ -123,29 +127,30 @@ impl EventsState {
     > {
         self.remove_verified_events();
 
+        let start = std::time::Instant::now();
         let NewEvents {
             block_logs,
             new_tokens,
             priority_ops,
             withdrawal_events,
             withdrawal_pending_events,
-            last_block,
-        } = EventsState::get_new_events_and_last_watched_block(
-            web3,
-            zksync_contract,
-            governance_contract,
-            self.last_watched_eth_block_number,
-            eth_blocks_step,
-            end_eth_blocks_offset,
-        )
-        .await?;
+            last_block: _,
+        } = self
+            .get_new_events_and_last_watched_block(
+                web3,
+                zksync_contract,
+                governance_contract,
+                eth_blocks_step,
+                end_eth_blocks_offset,
+            )
+            .await?;
+        vlog::debug!("Fetched new events from Ethereum in {:?}", start.elapsed());
         // Parse the initial contract version.
         let init_contract_version = ZkSyncContractVersion::try_from(init_contract_version)
             .expect("invalid initial contract version provided");
         // Pass Ethereum block numbers that correspond to `UpgradeComplete`
         // events emitted by the Upgrade GateKeeper. Should be provided by the
         // config.
-        self.last_watched_eth_block_number = last_block;
         for (zksync_contract, block_events) in block_logs {
             self.update_blocks_state(
                 zksync_contract,
@@ -198,34 +203,37 @@ impl EventsState {
     ///
     #[allow(clippy::needless_lifetimes)] // Cargo clippy gives a false positive warning on needless_lifetimes there, so can be allowed.
     async fn get_new_events_and_last_watched_block<'a, T: Transport>(
+        &mut self,
         web3: &Web3<T>,
         zksync_contract: &'a ZkSyncDeployedContract<T>,
         governance_contract: &(ethabi::Contract, Contract<T>),
-        last_watched_block_number: u64,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> anyhow::Result<NewEvents<'a, T>> {
-        let latest_eth_block_minus_delta =
-            EventsState::get_last_block_number(web3).await? - end_eth_blocks_offset;
+        // Do not query it for every call
+        if self.latest_eth_block <= self.last_watched_eth_block_number {
+            self.latest_eth_block =
+                EventsState::get_last_block_number(web3).await? - end_eth_blocks_offset;
+        }
 
-        if latest_eth_block_minus_delta == last_watched_block_number {
+        if self.latest_eth_block == self.last_watched_eth_block_number {
             return Ok(NewEvents {
                 block_logs: vec![],
                 new_tokens: vec![],
                 priority_ops: vec![],
                 withdrawal_events: vec![],
                 withdrawal_pending_events: vec![],
-                last_block: last_watched_block_number,
+                last_block: self.last_watched_eth_block_number,
             });
             // No new eth blocks
         }
 
-        let from_block_number_u64 = last_watched_block_number + 1;
+        let from_block_number_u64 = self.last_watched_eth_block_number + 1;
 
         let to_block_number_u64 =
         // if (latest eth block < last watched + delta) then choose it
-        if from_block_number_u64 + eth_blocks_step > latest_eth_block_minus_delta {
-            latest_eth_block_minus_delta
+        if from_block_number_u64 + eth_blocks_step > self.latest_eth_block {
+            self.last_watched_eth_block_number
         } else {
             from_block_number_u64 + eth_blocks_step
         };
@@ -247,22 +255,33 @@ impl EventsState {
         .await?;
         logs.push((zksync_contract, block_logs));
 
-        let priority_op_data = EventsState::get_priority_operations_logs(
-            web3,
-            zksync_contract,
-            from_block_number_u64.into(),
-            to_block_number_u64.into(),
-        )
-        .await?;
+        let (priority_op_data, withdrawal_events, withdrawal_pending_events) = if self
+            .ignore_priority_ops
+        {
+            let priority_op_data = EventsState::get_priority_operations_logs(
+                web3,
+                zksync_contract,
+                from_block_number_u64.into(),
+                to_block_number_u64.into(),
+            )
+            .await?;
 
-        let (withdrawal_events, withdrawal_pending_events) = EventsState::get_withdrawal_logs(
-            web3,
-            zksync_contract,
-            from_block_number_u64.into(),
-            to_block_number_u64.into(),
-        )
-        .await?;
-
+            let (withdrawal_events, withdrawal_pending_events) = EventsState::get_withdrawal_logs(
+                web3,
+                zksync_contract,
+                from_block_number_u64.into(),
+                to_block_number_u64.into(),
+            )
+            .await?;
+            (
+                priority_op_data,
+                withdrawal_events,
+                withdrawal_pending_events,
+            )
+        } else {
+            (vec![], vec![], vec![])
+        };
+        self.last_watched_eth_block_number = to_block_number_u64;
         Ok(NewEvents {
             block_logs: logs,
             new_tokens,

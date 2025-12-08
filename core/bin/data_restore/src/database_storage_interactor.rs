@@ -282,6 +282,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
             verified_events,
             last_watched_eth_block_number,
             priority_op_data,
+            ..Default::default()
         }
     }
 

@@ -294,7 +294,7 @@ impl InMemoryStorageInteractor {
             committed_events,
             verified_events,
             last_watched_eth_block_number: inner.last_watched_block,
-            priority_op_data: Default::default(),
+            ..Default::default()
         }
     }
 

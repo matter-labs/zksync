@@ -22,7 +22,7 @@ zksync_utils = { path = "../../lib/utils", version = "1.0" }
 zksync_prover_utils = { path = "../../lib/prover_utils", version = "1.0" }
 zksync_prometheus_exporter = { path = "../../lib/prometheus_exporter", version = "1.0" }
 
-vlog = { path = "../../lib/vlog", version = "1.0"}
+vlog = { path = "../../lib/vlog", version = "1.0" }
 tracing = "0.1.22"
 
 serde = "1.0.90"
@@ -31,8 +31,8 @@ metrics = "0.17"
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 actix-rt = "2.2.0"
-actix-web = "4.0.0-beta.8"
-actix-web-httpauth = "0.6.0-beta.2"
+actix-web = "4.0.0"
+actix-web-httpauth = "0.6.0"
 
 ctrlc = { version = "3.1", features = ["termination"] }
 jsonwebtoken = "7"

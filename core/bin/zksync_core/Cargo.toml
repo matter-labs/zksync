@@ -43,7 +43,7 @@ vlog = { path = "../../lib/vlog", version = "1.0" }
 tokio = { version = "1", features = ["time"] }
 futures = "0.3"
 actix-rt = "2.2.0"
-actix-web = "4.0.0-beta.8"
+actix-web = "4.0.0"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 chrono = { version = "0.4", features = ["serde"] }
 ctrlc = { version = "3.1", features = ["termination"] }

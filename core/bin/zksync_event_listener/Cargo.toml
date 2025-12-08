@@ -11,9 +11,9 @@ categories = ["cryptography"]
 publish = false # We don't want to publish our binaries.
 
 [dependencies]
-actix-web-actors = "=4.0.0-beta.6"
+actix-web-actors = "=4.0.0"
 actix = "0.12.0"
-actix-web = "4.0.0-beta.8"
+actix-web = "4.0.0"
 
 anyhow = "1.0"
 futures-util = "0.3"
