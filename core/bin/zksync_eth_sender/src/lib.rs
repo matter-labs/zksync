@@ -557,8 +557,10 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             op.id,
             self.eth_tx_description(&new_tx),
         );
-        self.ethereum.send_raw_tx(new_tx.raw_tx).await?;
         transaction.commit().await?;
+        if let (err) = self.ethereum.send_raw_tx(new_tx.raw_tx).await {
+            vlog::warn!("Error while sending the supplement operation tx: {}", err);
+        }
 
         metrics::histogram!("eth_sender.perform_commitment_step", start.elapsed());
         Ok(OperationCommitment::Pending)
