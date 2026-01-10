@@ -1,4 +1,4 @@
-FROM rust:1.78
+FROM rust:1.91
 WORKDIR /usr/src/zksync
 
 RUN apt update && apt install wget openssl libssl-dev pkg-config npm curl libpq5 libpq-dev lsb-release -y
