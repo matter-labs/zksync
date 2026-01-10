@@ -24,7 +24,7 @@ jobs:
   loadtest:
     name: Perform loadtest
     runs-on: [matterlabs-ci-runner]
-    container: rust:1.67
+    container: rust:1.91
     env:
       WEB3_URL: ${{ secrets.CI_LOADTEST_WEB3_URL }}
       MASTER_WALLET_PK: ${{ secrets.CI_LOADTEST_MAIN_PRIVKEY }}
@@ -47,8 +47,7 @@ jobs:
     if: always() && !cancelled()
     steps:
       - uses: technote-space/workflow-conclusion-action@482bb0dbebad067b3b26ca4f6222c4023cf51ccf # v2
-      -
-        name: Notify to Mattermost (on incidents)
+      - name: Notify to Mattermost (on incidents)
         uses: tferreira/matterfy@releases/v1
         if: ${{ env.WORKFLOW_CONCLUSION == 'failure' }}
         with:

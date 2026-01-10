@@ -558,7 +558,7 @@ impl<DB: DatabaseInterface> ETHSender<DB> {
             self.eth_tx_description(&new_tx),
         );
         transaction.commit().await?;
-        if let (err) = self.ethereum.send_raw_tx(new_tx.raw_tx).await {
+        if let Err(err) = self.ethereum.send_raw_tx(new_tx.raw_tx).await {
             vlog::warn!("Error while sending the supplement operation tx: {}", err);
         }
 
