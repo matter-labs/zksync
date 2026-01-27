@@ -1,6 +1,6 @@
 use ethabi::ParamType;
 
-use zksync_types::{AccountId, BlockNumber, ZkSyncOp, H256};
+use zksync_types::{AccountId, BlockNumber, H256, ZkSyncOp};
 
 use crate::rollup_ops::RollupOpsBlock;
 
@@ -67,7 +67,7 @@ pub fn get_rollup_ops_from_data(data: &[u8]) -> Result<Vec<ZkSyncOp>, anyhow::Er
     )
 }
 
-pub(super) fn parse_pub_data<Parse, ParseErr, GetSize, GetSizeErr>(
+pub fn parse_pub_data<Parse, ParseErr, GetSize, GetSizeErr>(
     data: &[u8],
     parse: Parse,
     get_data_size: GetSize,

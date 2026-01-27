@@ -3,7 +3,6 @@ use std::fmt::{self, Display};
 
 // External uses
 use actix_web::body::BoxBody;
-use actix_web::dev::JsonBody;
 use actix_web::http::header::HeaderValue;
 use actix_web::{HttpResponse, ResponseError};
 use reqwest::{header::CONTENT_TYPE, StatusCode};

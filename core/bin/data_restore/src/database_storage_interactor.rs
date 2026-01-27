@@ -1,5 +1,8 @@
 // Built-in deps
 use std::str::FromStr;
+use zksync_l1_event_listener::{
+    events::BlockEvent, events_state::EventsState, rollup_ops::RollupOpsBlock,
+};
 // Workspace deps
 use zksync_storage::{
     data_restore::records::{NewBlockEvent, NewRollupOpsBlock},
@@ -17,9 +20,6 @@ use zksync_types::{
 use crate::storage_interactor::StoredTreeState;
 use crate::{
     data_restore_driver::StorageUpdateState,
-    events::BlockEvent,
-    events_state::EventsState,
-    rollup_ops::RollupOpsBlock,
     storage_interactor::{
         block_event_into_stored_block_event, stored_block_event_into_block_event,
         stored_ops_block_into_ops_block, CachedTreeState,

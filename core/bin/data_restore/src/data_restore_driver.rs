@@ -6,25 +6,24 @@ use web3::{
     types::{H160, H256},
     Transport, Web3,
 };
+
 // Workspace deps
 use zksync_contracts::governance_contract;
 use zksync_crypto::{
     params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID},
     Fr,
 };
+use zksync_l1_event_listener::{
+    contract::ZkSyncDeployedContract, eth_tx_helpers::get_ethereum_transaction,
+    events_state::EventsState, rollup_ops::RollupOpsBlock,
+};
 use zksync_types::{
     Account, AccountId, AccountMap, AccountUpdate, BlockNumber, SerialId, Token, TokenKind,
 };
 
 // Local deps
-use crate::{
-    contract::{get_genesis_account, ZkSyncDeployedContract},
-    eth_tx_helpers::get_ethereum_transaction,
-    events_state::EventsState,
-    rollup_ops::RollupOpsBlock,
-    storage_interactor::StorageInteractor,
-    tree_state::TreeState,
-};
+use crate::utils::get_genesis_account;
+use crate::{storage_interactor::StorageInteractor, tree_state::TreeState};
 
 /// Storage state update:
 /// - None - The state is updated completely last time - start from fetching the new events

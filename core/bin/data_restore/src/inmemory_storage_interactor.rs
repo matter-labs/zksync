@@ -4,7 +4,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use web3::types::Address;
-
+use zksync_l1_event_listener::{
+    events::{BlockEvent, EventType},
+    events_state::EventsState,
+    rollup_ops::RollupOpsBlock,
+};
 use zksync_types::block::Block;
 use zksync_types::withdrawals::{WithdrawalEvent, WithdrawalPendingEvent};
 use zksync_types::{
@@ -14,9 +18,6 @@ use zksync_types::{
 
 use crate::{
     data_restore_driver::StorageUpdateState,
-    events::{BlockEvent, EventType},
-    events_state::EventsState,
-    rollup_ops::RollupOpsBlock,
     storage_interactor::{CachedTreeState, StoredTreeState},
 };
 

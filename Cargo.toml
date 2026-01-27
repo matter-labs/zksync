@@ -9,6 +9,7 @@ members = [
     "core/bin/block_revert",
     "core/bin/remove_proofs",
     "core/bin/tx_count_migration",
+    "core/bin/exit_tree_generator",
     # Server micro-services
     "core/bin/zksync_api",
     "core/bin/zksync_core",
@@ -38,6 +39,7 @@ members = [
     "core/lib/notifier",
     "core/lib/api_types",
     "core/lib/balancer",
+    "core/lib/l1_event_listener",
     # Test infrastructure
     "core/tests/flamegraph_target",
     "core/tests/test_account",

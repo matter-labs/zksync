@@ -227,6 +227,7 @@ jobs:
       - name: init
         run: |
           ci_run git config --global --add url."https://${{ secrets.ZKSYNC_ADMIN_BOT_ORG_REPO_WRITE }}:x-oauth-basic@github.com/".insteadOf https://github.com/
+          ci_run apt update && ci_run apt install -y clang libclang-dev llvm
           ci_run zk
           ci_run zk run plonk-setup
           ci_run zk run verify-keys unpack

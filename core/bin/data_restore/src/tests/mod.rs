@@ -26,7 +26,6 @@ use zksync_types::{
     ZkSyncOp, H256,
 };
 
-use crate::contract::ZkSyncDeployedContract;
 use crate::{
     data_restore_driver::DataRestoreDriver,
     database_storage_interactor::DatabaseStorageInteractor,
@@ -36,6 +35,7 @@ use crate::{
     END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
 };
 use web3::api::{Eth, Namespace};
+use zksync_l1_event_listener::contract::ZkSyncDeployedContract;
 use zksync_types::aggregated_operations::BlocksCommitOperation;
 
 fn create_withdraw_operations(

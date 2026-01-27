@@ -40,7 +40,7 @@ pub fn rollup_ops_blocks_from_bytes(data: Vec<u8>) -> anyhow::Result<Vec<RollupO
     rollup_ops_blocks_from_bytes_inner(data, ZkSyncContractVersion::V4)
 }
 
-pub(super) fn rollup_ops_blocks_from_bytes_inner(
+pub fn rollup_ops_blocks_from_bytes_inner(
     data: Vec<u8>,
     contract_version: ZkSyncContractVersion,
 ) -> anyhow::Result<Vec<RollupOpsBlock>> {

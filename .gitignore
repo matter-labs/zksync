@@ -49,3 +49,4 @@ core/lib/storage/.env
 # Perf/flamegraph files
 perf.data*
 flamegraph.svg
+restored_data

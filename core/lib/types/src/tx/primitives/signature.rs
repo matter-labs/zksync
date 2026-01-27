@@ -21,7 +21,7 @@ use crate::tx::{
 /// zkSync transaction signature.
 ///
 /// Represents a MuSig Rescue signature for the message.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TxSignature {
     pub pub_key: PackedPublicKey,
@@ -105,15 +105,6 @@ pub enum DeserializeError {
     DeserializePublicKey(#[from] packed_public_key::DeserializeError),
     #[error("Cannot deserialize signature: {0}")]
     DeserializeSignature(#[from] packed_signature::DeserializeError),
-}
-
-impl Default for TxSignature {
-    fn default() -> Self {
-        Self {
-            pub_key: PackedPublicKey::default(),
-            signature: PackedSignature::default(),
-        }
-    }
 }
 
 impl std::fmt::Debug for TxSignature {

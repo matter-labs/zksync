@@ -1,7 +1,7 @@
 // Built-in deps
 use std::cmp::Ordering;
 // External deps
-use crate::contract::ZkSyncContractVersion;
+use crate::contract::version::ZkSyncContractVersion;
 use web3::types::H256;
 use zksync_types::BlockNumber;
 

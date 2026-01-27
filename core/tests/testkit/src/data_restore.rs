@@ -9,8 +9,8 @@ use zksync_types::{Account, AccountId, TokenId};
 
 use crate::{external_commands::Contracts, TestkitConfig};
 
-use zksync_data_restore::contract::ZkSyncDeployedContract;
 use zksync_data_restore::storage_interactor::StorageInteractor;
+use zksync_l1_event_listener::contract::ZkSyncDeployedContract;
 
 pub async fn verify_restore(
     testkit_config: &TestkitConfig,

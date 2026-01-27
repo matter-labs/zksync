@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use anyhow::format_err;
 use web3::contract::Contract;
 use web3::types::{
-    BlockNumber as Web3BlockNumber, FilterBuilder, Log, Transaction, H256, U256, U64,
+    BlockNumber as Web3BlockNumber, FilterBuilder, H256, Log, Transaction, U64, U256,
 };
 use web3::{Transport, Web3};
 // Workspace deps
@@ -32,7 +32,6 @@ pub struct EventsState {
     /// fetching fields which are not present in public data
     /// such as Ethereum transaction hash.
     pub priority_op_data: HashMap<SerialId, PriorityOp>,
-    pub ignore_priority_ops: bool,
     pub latest_eth_block: u64,
 }
 
@@ -54,7 +53,6 @@ impl std::default::Default for EventsState {
             last_watched_eth_block_number: 0,
             latest_eth_block: 0,
             priority_op_data: HashMap::new(),
-            ignore_priority_ops: false,
         }
     }
 }
@@ -180,6 +178,20 @@ impl EventsState {
         ))
     }
 
+    pub async fn sync_is_finished<T: Transport>(
+        &mut self,
+        web3: &Web3<T>,
+        end_eth_blocks_offset: u64,
+    ) -> Result<bool, anyhow::Error> {
+        // Do not query it for every call
+        if self.latest_eth_block <= self.last_watched_eth_block_number {
+            self.latest_eth_block =
+                EventsState::get_last_block_number(web3).await? - end_eth_blocks_offset;
+        }
+
+        Ok(self.last_watched_eth_block_number >= self.latest_eth_block)
+    }
+
     /// Returns a last watched ethereum block number
     ///
     /// # Arguments
@@ -210,13 +222,7 @@ impl EventsState {
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> anyhow::Result<NewEvents<'a, T>> {
-        // Do not query it for every call
-        if self.latest_eth_block <= self.last_watched_eth_block_number {
-            self.latest_eth_block =
-                EventsState::get_last_block_number(web3).await? - end_eth_blocks_offset;
-        }
-
-        if self.latest_eth_block == self.last_watched_eth_block_number {
+        if self.sync_is_finished(web3, end_eth_blocks_offset).await? {
             return Ok(NewEvents {
                 block_logs: vec![],
                 new_tokens: vec![],
@@ -255,32 +261,21 @@ impl EventsState {
         .await?;
         logs.push((zksync_contract, block_logs));
 
-        let (priority_op_data, withdrawal_events, withdrawal_pending_events) = if self
-            .ignore_priority_ops
-        {
-            let priority_op_data = EventsState::get_priority_operations_logs(
-                web3,
-                zksync_contract,
-                from_block_number_u64.into(),
-                to_block_number_u64.into(),
-            )
-            .await?;
+        let priority_op_data = EventsState::get_priority_operations_logs(
+            web3,
+            zksync_contract,
+            from_block_number_u64.into(),
+            to_block_number_u64.into(),
+        )
+        .await?;
 
-            let (withdrawal_events, withdrawal_pending_events) = EventsState::get_withdrawal_logs(
-                web3,
-                zksync_contract,
-                from_block_number_u64.into(),
-                to_block_number_u64.into(),
-            )
-            .await?;
-            (
-                priority_op_data,
-                withdrawal_events,
-                withdrawal_pending_events,
-            )
-        } else {
-            (vec![], vec![], vec![])
-        };
+        let (withdrawal_events, withdrawal_pending_events) = EventsState::get_withdrawal_logs(
+            web3,
+            zksync_contract,
+            from_block_number_u64.into(),
+            to_block_number_u64.into(),
+        )
+        .await?;
         self.last_watched_eth_block_number = to_block_number_u64;
         Ok(NewEvents {
             block_logs: logs,
@@ -486,7 +481,7 @@ impl EventsState {
     /// * `from` - From ethereum block number
     /// * `to` - To ethereum block number
     ///
-    async fn get_token_added_logs<T: Transport>(
+    pub async fn get_token_added_logs<T: Transport>(
         web3: &Web3<T>,
         contract: &(ethabi::Contract, Contract<T>),
         from: Web3BlockNumber,
@@ -698,8 +693,8 @@ mod test {
         types::{Bytes, H160},
     };
 
-    use crate::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
-    use crate::tests::utils::{create_log, u32_to_32bytes, FakeTransport};
+    use zksync_data_restore::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
+    use zksync_data_restore::tests::utils::{FakeTransport, create_log, u32_to_32bytes};
 
     #[test]
     fn event_state() {

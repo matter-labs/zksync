@@ -1,8 +1,8 @@
-use crate::rollup_ops::RollupOpsBlock;
 use anyhow::format_err;
 use std::collections::HashMap;
 use zksync_crypto::merkle_tree::parallel_smt::SparseMerkleTreeSerializableCacheBN256;
 use zksync_crypto::{params::account_tree_depth, Fr};
+use zksync_l1_event_listener::rollup_ops::RollupOpsBlock;
 use zksync_state::{
     handler::TxHandler,
     state::{CollectedFee, OpSuccess, TransferOutcome, ZkSyncState},
@@ -594,10 +594,10 @@ impl TreeState {
 
 #[cfg(test)]
 mod test {
-    use crate::contract::v6::get_rollup_ops_from_data;
-    use crate::rollup_ops::RollupOpsBlock;
     use crate::tree_state::TreeState;
     use num::BigUint;
+    use zksync_l1_event_listener::contract::v6::get_rollup_ops_from_data;
+    use zksync_l1_event_listener::rollup_ops::RollupOpsBlock;
     use zksync_types::tx::ChangePubKey;
     use zksync_types::{
         AccountId, BlockNumber, ChangePubKeyOp, Deposit, DepositOp, ForcedExit, ForcedExitOp,

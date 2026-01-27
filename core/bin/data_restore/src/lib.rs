@@ -1,17 +1,13 @@
-pub mod contract;
 pub mod data_restore_driver;
 pub mod database_storage_interactor;
-pub mod eth_tx_helpers;
-pub mod events;
-pub mod events_state;
 pub mod inmemory_storage_interactor;
-pub mod rollup_ops;
 pub mod storage_interactor;
 pub mod tree_state;
 
 pub mod config;
 #[cfg(test)]
 mod tests;
+pub mod utils;
 
 use crate::storage_interactor::StorageInteractor;
 use zksync_types::{tokens::get_genesis_token_list, TokenId};

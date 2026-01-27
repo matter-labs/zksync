@@ -1,24 +1,26 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use web3::types::H256;
-
+use zksync_l1_event_listener::{
+    contract::ZkSyncContractVersion,
+    events::{BlockEvent, EventType},
+    events_state::EventsState,
+    rollup_ops::RollupOpsBlock,
+};
 use zksync_storage::data_restore::records::{
     NewBlockEvent, StoredBlockEvent, StoredRollupOpsBlock,
 };
-use zksync_types::withdrawals::{WithdrawalEvent, WithdrawalPendingEvent};
 use zksync_types::{
-    block::Block, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, NewTokenEvent,
-    PriorityOp, SerialId, Token, TokenId, TokenInfo, NFT,
+    block::Block,
+    withdrawals::{WithdrawalEvent, WithdrawalPendingEvent},
+    AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, NewTokenEvent, PriorityOp,
+    SerialId, Token, TokenId, TokenInfo, NFT,
 };
 
 use crate::{
-    contract::ZkSyncContractVersion,
     data_restore_driver::StorageUpdateState,
     database_storage_interactor::DatabaseStorageInteractor,
-    events::{BlockEvent, EventType},
-    events_state::EventsState,
     inmemory_storage_interactor::InMemoryStorageInteractor,
-    rollup_ops::RollupOpsBlock,
 };
 
 pub struct StoredTreeState {

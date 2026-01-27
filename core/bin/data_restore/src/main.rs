@@ -5,13 +5,12 @@ use zksync_crypto::convert::FeConvert;
 use zksync_storage::ConnectionPool;
 
 use web3::Web3;
-use zksync_data_restore::config::ContractsConfig;
-use zksync_data_restore::contract::ZkSyncDeployedContract;
 use zksync_data_restore::{
     add_tokens_to_storage, data_restore_driver::DataRestoreDriver,
     database_storage_interactor::DatabaseStorageInteractor, storage_interactor::StorageInteractor,
     END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
 };
+use zksync_l1_event_listener::{config::ContractsConfig, contract::ZkSyncDeployedContract};
 
 #[derive(StructOpt)]
 #[structopt(

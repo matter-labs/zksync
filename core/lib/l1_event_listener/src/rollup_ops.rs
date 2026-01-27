@@ -2,7 +2,7 @@ use web3::{Transport, Web3};
 
 use zksync_types::operations::ZkSyncOp;
 
-use crate::contract::ZkSyncContractVersion;
+use crate::contract::version::ZkSyncContractVersion;
 use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use crate::events::BlockEvent;
 use zksync_types::{AccountId, BlockNumber, H256};
