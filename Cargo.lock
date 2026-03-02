@@ -4276,16 +4276,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rocksdb"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26ec73b20525cb235bad420f911473b69f9fe27cc856c5461bccd7e4af037f43"
-dependencies = [
- "libc",
- "librocksdb-sys",
-]
-
-[[package]]
 name = "rs_merkle"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

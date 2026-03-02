@@ -36,6 +36,11 @@ impl TxHandler<MintNFT> for ZkSyncState {
             .ok_or(MintNFTOpError::CreatorAccountNotFound)?;
         invariant!(
             creator.pub_key_hash != PubKeyHash::default(),
+            MintNFTOpError::CreatorAccountIsIncorrect
+        );
+
+        invariant!(
+            creator.address != tx.creator_address,
             MintNFTOpError::CreatorAccountIsLocked
         );
 

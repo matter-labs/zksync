@@ -100,6 +100,8 @@ pub enum MintNFTOpError {
     InvalidTokenId,
     #[error("Creator account is locked")]
     CreatorAccountIsLocked,
+    #[error("Creator account is incorrect")]
+    CreatorAccountIsIncorrect,
     #[error("Creator account does not exist")]
     CreatorAccountNotFound,
     #[error("Account is locked")]
