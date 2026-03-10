@@ -18,3 +18,5 @@ zksync_types = { path = "../../lib/types", version = "1.0" }
 zksync_config = { path = "../../lib/config", version = "1.0" }
 zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
 
+[dev-dependencies]
+num = { version = "0.3.1", features = ["serde"] }

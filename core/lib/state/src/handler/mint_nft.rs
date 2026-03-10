@@ -38,10 +38,9 @@ impl TxHandler<MintNFT> for ZkSyncState {
             creator.pub_key_hash != PubKeyHash::default(),
             MintNFTOpError::CreatorAccountIsIncorrect
         );
-
         invariant!(
-            creator.address != tx.creator_address,
-            MintNFTOpError::CreatorAccountIsLocked
+            creator.address == tx.creator_address,
+            MintNFTOpError::CreatorAccountIsIncorrect
         );
 
         if let Some((pub_key_hash, _)) = tx.verify_signature() {

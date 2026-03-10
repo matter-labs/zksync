@@ -3,7 +3,7 @@ FROM debian:bullseye
 WORKDIR /usr/src/zksync
 
 # Install required dependencies
-RUN apt-get update; apt-get install -y make bash git gnupg openssl libssl-dev gcc g++ curl libpq-dev pkg-config software-properties-common jq
+RUN apt-get update; apt-get install -y make bash git gnupg openssl libssl-dev gcc g++ curl libpq-dev pkg-config software-properties-common jq xz-utils
 
 #install docker engine
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
@@ -11,8 +11,10 @@ RUN add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debia
 RUN apt update; apt install -y docker-ce-cli
 
 # Install node and yarn
-RUN curl -sL https://deb.nodesource.com/setup_14.x | bash -
-RUN apt-get install -y nodejs
+ARG NODE_VERSION=18.20.8
+RUN curl -fsSLO https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz && \
+    tar -xJf node-v${NODE_VERSION}-linux-x64.tar.xz -C /usr/local --strip-components=1 && \
+    rm node-v${NODE_VERSION}-linux-x64.tar.xz
 RUN npm install -g yarn
 RUN npm install -g ts-node
 

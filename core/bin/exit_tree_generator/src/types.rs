@@ -58,13 +58,13 @@ pub struct MerkleTreeLeaf {
 ///
 /// # Panics
 /// Panics if balance string cannot be parsed as a decimal number
-impl Into<Vec<u8>> for MerkleTreeLeaf {
-    fn into(self) -> Vec<u8> {
+impl From<MerkleTreeLeaf> for Vec<u8> {
+    fn from(val: MerkleTreeLeaf) -> Self {
         ethabi::encode(&[
-            ethabi::Token::Address(self.account_address),
-            ethabi::Token::Address(self.token_address),
+            ethabi::Token::Address(val.account_address),
+            ethabi::Token::Address(val.token_address),
             ethabi::Token::Uint(U256::from_big_endian(
-                BigDecimal::from_str(&self.balance)
+                BigDecimal::from_str(&val.balance)
                     .unwrap()
                     .to_bigint()
                     .unwrap()

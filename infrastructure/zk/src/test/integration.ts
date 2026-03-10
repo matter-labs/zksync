@@ -1,9 +1,43 @@
 import { Command } from 'commander';
 import * as utils from '../utils';
 import fs from 'fs';
+import path from 'path';
 import * as dummyProver from '../dummy-prover';
 import * as contract from '../contract';
 import * as run from '../run/run';
+
+async function ensureZkSyncSdkBuilt() {
+    const zksyncHome = process.env.ZKSYNC_HOME;
+    if (!zksyncHome) {
+        throw new Error('ZKSYNC_HOME is not set');
+    }
+
+    const buildIndex = path.join(zksyncHome, 'sdk/zksync.js/build/index.js');
+    if (fs.existsSync(buildIndex)) {
+        return;
+    }
+
+    await utils.spawn('yarn run build:zksync-sdk');
+}
+
+async function runTsTests(testFile: string) {
+    const zksyncHome = process.env.ZKSYNC_HOME;
+    if (!zksyncHome) {
+        throw new Error('ZKSYNC_HOME is not set');
+    }
+
+    const tsTestsDir = path.join(zksyncHome, 'core/tests/ts-tests');
+    const mochaCandidates = [
+        path.join(tsTestsDir, 'node_modules/mocha/bin/mocha'),
+        path.join(zksyncHome, 'node_modules/mocha/bin/mocha')
+    ];
+    const mochaBin = mochaCandidates.find((candidate) => fs.existsSync(candidate));
+    if (!mochaBin) {
+        throw new Error('Unable to find mocha binary for TS integration tests');
+    }
+
+    await utils.spawn(`cd "${tsTestsDir}" && node "${mochaBin}" -r ts-node/register "${testFile}"`);
+}
 
 export async function withServer(testSuite: () => Promise<void>, timeout: number) {
     if (!(await dummyProver.status())) {
@@ -113,15 +147,18 @@ export async function apiDocs() {
 }
 
 export async function api() {
-    await utils.spawn('yarn ts-tests api-test');
+    await ensureZkSyncSdkBuilt();
+    await runTsTests('tests/api.test.ts');
 }
 
 export async function server() {
-    await utils.spawn('yarn ts-tests test');
+    await ensureZkSyncSdkBuilt();
+    await runTsTests('tests/main.test.ts');
 }
 
 export async function withdrawalHelpers() {
-    await utils.spawn('yarn ts-tests withdrawal-helpers-test');
+    await ensureZkSyncSdkBuilt();
+    await runTsTests('tests/withdrawal-helpers.test.ts');
 }
 
 export async function testkit(command: string, timeout: number) {

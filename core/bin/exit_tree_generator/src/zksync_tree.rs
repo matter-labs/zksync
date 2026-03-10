@@ -43,7 +43,7 @@ fn restore_account(
     account.address = Address::from_str(&stored_account.address).expect("Correct address");
     account.pub_key_hash = PubKeyHash::from_hex(&stored_account.pubkey_hash)
         .expect("db stored pubkey hash deserialize");
-    for b in stored_balances.into_iter() {
+    for b in stored_balances.iter() {
         assert_eq!(b.account_id, stored_account.id);
         let balance = BigDecimal::from_str(&b.balance)
             .unwrap()
@@ -57,7 +57,7 @@ fn restore_account(
 }
 
 /// Restores the AccountMap from CSV files.
-pub fn restore_account_map(
+pub(crate) fn restore_account_map(
     stored_accounts: HashMap<u32, StorageAccount>,
     stored_balances: HashMap<u32, Vec<StorageBalance>>,
 ) -> anyhow::Result<AccountMap> {

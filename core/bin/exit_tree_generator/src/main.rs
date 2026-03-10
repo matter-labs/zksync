@@ -1,14 +1,8 @@
-mod consts;
-mod csv_utils;
-mod keccak_merkle_tree;
-#[cfg(feature = "postgres")]
-mod restore_tree_from_db;
-mod token_id_restorer;
-mod types;
-mod zksync_tree;
-
 use structopt::StructOpt;
 use web3::ethabi::Address;
+#[cfg(feature = "postgres")]
+use zksync_exit_tree_generator::restore_tree_from_db;
+use zksync_exit_tree_generator::{keccak_merkle_tree, token_id_restorer, zksync_tree};
 
 #[derive(StructOpt)]
 #[structopt(name = "Exit tree generator", author = "Matter Labs")]

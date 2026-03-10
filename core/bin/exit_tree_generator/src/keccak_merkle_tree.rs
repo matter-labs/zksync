@@ -72,7 +72,7 @@ pub fn run_create_proof_for_keccak_tree(
 /// Root hash if leaves were found, None otherwise
 fn calculate_root(leaves: &HashMap<(Address, Address), MerkleTreeLeaf>) -> Option<[u8; 32]> {
     println!("Loaded {} leaves", leaves.len());
-    let tree = create_tree(&leaves);
+    let tree = create_tree(leaves);
     println!("Calculating Merkle root");
     tree.root()
 }
@@ -101,7 +101,7 @@ fn create_proof(
     account: Address,
     tokens: &[Address],
 ) -> anyhow::Result<MerkleProof<Keccak256>> {
-    let merkle_tree = create_tree(&leaves);
+    let merkle_tree = create_tree(leaves);
 
     let leaves: anyhow::Result<Vec<_>> = tokens
         .iter()

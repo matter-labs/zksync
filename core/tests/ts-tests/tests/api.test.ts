@@ -342,7 +342,11 @@ describe('ZkSync web3 API tests', () => {
             committedConfirmed = (await restProvider.networkStatus()).lastCommitted;
         } while (committedConfirmed < blockNumber);
 
-        const web3Receipt = await web3Provider.getTransactionReceipt(txHash);
+        let web3Receipt = await web3Provider.getTransactionReceipt(txHash);
+        while (web3Receipt == null) {
+            await utils.sleep(1000);
+            web3Receipt = await web3Provider.getTransactionReceipt(txHash);
+        }
         expect(web3Receipt.logs.length, 'Incorrect number of logs').to.eql(3);
 
         const zksyncTransferSignature = 'ZkSyncTransfer(address,address,address,uint256,uint256)';

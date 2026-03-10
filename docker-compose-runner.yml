@@ -24,6 +24,9 @@ services:
 
   zk:
     image: "matterlabs/zk-environment:latest"
+    build:
+      context: .
+      dockerfile: ./docker/zk-environment/Dockerfile
     depends_on:
       - postgres
       - geth

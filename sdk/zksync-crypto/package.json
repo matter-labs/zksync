@@ -2,8 +2,9 @@
 	"name": "zksync-crypto",
 	"version": "0.6.2",
 	"browser": "dist/zksync-crypto-web.js",
-	"main": "dist/zksync-crypto-node.js",
+	"main": "node-entry.js",
 	"files": [
+		"node-entry.js",
 		"dist/*.ts",
 		"dist/*.wasm",
 		"dist/*.js"

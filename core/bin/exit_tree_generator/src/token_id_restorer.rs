@@ -105,7 +105,7 @@ async fn loop_iteration<T: Transport>(
     events_state: &mut EventsState,
 ) -> anyhow::Result<Option<HashMap<Address, TokenId>>> {
     let res = events_state
-        .sync_is_finished(&web3, ETH_SYNC_CONFIRMATIONS)
+        .sync_is_finished(web3, ETH_SYNC_CONFIRMATIONS)
         .await?;
     if res {
         return Ok(None);
@@ -152,7 +152,7 @@ async fn set_genesis_state_from_eth<T: Transport>(
     genesis_tx_hash: H256,
     events_state: &mut EventsState,
 ) {
-    let genesis_transaction = get_ethereum_transaction(&web3, &genesis_tx_hash)
+    let genesis_transaction = get_ethereum_transaction(web3, &genesis_tx_hash)
         .await
         .expect("Cant get zkSync genesis transaction");
 

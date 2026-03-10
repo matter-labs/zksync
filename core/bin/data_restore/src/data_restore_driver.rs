@@ -341,7 +341,8 @@ impl<T: Transport> DataRestoreDriver<T> {
             vlog::info!("Last watched ethereum block: {:?}", last_watched_block);
 
             // Update events
-            if self.update_events_state(interactor).await {
+            let has_new_events = self.update_events_state(interactor).await;
+            if has_new_events {
                 // Update operations
                 let new_ops_blocks = self.update_operations_state(interactor).await;
 
@@ -354,7 +355,6 @@ impl<T: Transport> DataRestoreDriver<T> {
 
                     let total_verified_blocks =
                         self.zksync_contract.get_total_verified_blocks().await;
-
                     let last_verified_block = self.tree_state.block_number;
 
                     // We must update the Ethereum stats table to match the actual stored state
@@ -395,6 +395,18 @@ impl<T: Transport> DataRestoreDriver<T> {
                         }
                         break;
                     }
+                }
+            }
+
+            // In finite mode, check if the state is already up-to-date even when no new events
+            // were found (e.g. load_state_from_storage already processed all blocks).
+            if self.finite_mode {
+                let total_verified_blocks = self.zksync_contract.get_total_verified_blocks().await;
+                if *self.tree_state.block_number == total_verified_blocks {
+                    if self.final_hash.is_some() && !final_hash_was_found {
+                        panic!("Final hash was not met during the state restoring process");
+                    }
+                    break;
                 }
             }
 

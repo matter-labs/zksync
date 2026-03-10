@@ -246,7 +246,7 @@ async fn main() -> anyhow::Result<()> {
         contracts.contract_addr,
     );
 
-    let last_commited_block = storage
+    let last_commited_block_db = storage
         .chain()
         .block_schema()
         .get_last_committed_confirmed_block()
@@ -257,9 +257,23 @@ async fn main() -> anyhow::Result<()> {
         .get_last_verified_confirmed_block()
         .await?;
 
+    // Query the contract for the actual number of committed blocks to avoid
+    // trying to revert blocks that were stored in the DB but never sent to the contract.
+    let contract_total_committed: u32 = client
+        .call_main_contract_function("totalBlocksCommitted", (), None, Options::default(), None)
+        .await
+        .map_err(|e| format_err!("Failed to query totalBlocksCommitted: {}", e))?;
+    let last_commited_block = std::cmp::min(
+        last_commited_block_db,
+        BlockNumber(contract_total_committed),
+    );
+
     println!(
-        "Last committed block {} verified {}",
-        &last_commited_block, &last_verified_block
+        "Last committed block {} (db: {}, contract: {}) verified {}",
+        &last_commited_block,
+        &last_commited_block_db,
+        contract_total_committed,
+        &last_verified_block
     );
     ensure!(
         *last_verified_block <= opt.last_correct_block,

@@ -18,7 +18,7 @@ fn csv_reader(path: &str) -> anyhow::Result<csv::Reader<std::io::BufReader<std::
 ///
 /// # Returns
 /// A HashMap mapping account_id to a vector of StorageBalance records
-pub fn load_balances(path: &str) -> anyhow::Result<HashMap<u32, Vec<StorageBalance>>> {
+pub(crate) fn load_balances(path: &str) -> anyhow::Result<HashMap<u32, Vec<StorageBalance>>> {
     let mut balances = HashMap::new();
     for line in csv_reader(path)
         .with_context(|| format!("Unable to open file at {path}"))?
@@ -66,7 +66,7 @@ pub fn load_tokens(path: &str) -> anyhow::Result<HashMap<u64, Address>> {
 ///
 /// # Returns
 /// A mapping of account_id to Full Account
-pub fn load_accounts(path: &str) -> anyhow::Result<HashMap<u32, StorageAccount>> {
+pub(crate) fn load_accounts(path: &str) -> anyhow::Result<HashMap<u32, StorageAccount>> {
     let mut accounts = HashMap::new();
     for line in csv_reader(path)
         .with_context(|| format!("Unable to open file at {path}"))?

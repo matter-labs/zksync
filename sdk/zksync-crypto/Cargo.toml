@@ -47,3 +47,6 @@ crypto_lib = { package = "zksync_crypto", path = "../../core/lib/crypto" }
 [profile.release]
 # Tell `rustc` to optimize for small code size.
 opt-level = "s"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

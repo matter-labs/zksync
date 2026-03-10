@@ -237,9 +237,9 @@ impl EventsState {
         let from_block_number_u64 = self.last_watched_eth_block_number + 1;
 
         let to_block_number_u64 =
-        // if (latest eth block < last watched + delta) then choose it
+        // if (latest eth block < last watched + delta) then clip to latest
         if from_block_number_u64 + eth_blocks_step > self.latest_eth_block {
-            self.last_watched_eth_block_number
+            self.latest_eth_block
         } else {
             from_block_number_u64 + eth_blocks_step
         };
@@ -689,18 +689,52 @@ impl EventsState {
 mod test {
     use super::EventsState;
     use web3::{
-        api::{Eth, Namespace},
-        types::{Bytes, H160},
+        Web3,
+        transports::Http,
+        types::{Bytes, H160, H256, Log},
     };
 
-    use zksync_data_restore::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
-    use zksync_data_restore::tests::utils::{FakeTransport, create_log, u32_to_32bytes};
+    use crate::contract::{ZkSyncContractVersion, ZkSyncDeployedContract};
+
+    fn u32_to_32bytes(value: u32) -> [u8; 32] {
+        let mut bytes = [0u8; 32];
+        let bytes_value = value.to_be_bytes();
+        bytes[28..32].clone_from_slice(&bytes_value);
+        bytes
+    }
+
+    fn create_log(
+        address: H160,
+        topic: H256,
+        additional_topics: Vec<H256>,
+        data: Bytes,
+        block_number: u32,
+        transaction_hash: H256,
+    ) -> Log {
+        let mut topics = vec![topic];
+        topics.extend(additional_topics);
+        Log {
+            address,
+            topics,
+            data,
+            block_hash: None,
+            block_number: Some(block_number.into()),
+            transaction_hash: Some(transaction_hash),
+            transaction_index: Some(0.into()),
+            log_index: Some(0.into()),
+            transaction_log_index: Some(0.into()),
+            log_type: Some("mined".into()),
+            removed: None,
+        }
+    }
 
     #[test]
     fn event_state() {
         let mut events_state = EventsState::default();
 
-        let contract = ZkSyncDeployedContract::version4(Eth::new(FakeTransport), [1u8; 20].into());
+        let transport = Http::new("http://127.0.0.1:8545").expect("HTTP transport should parse");
+        let web3 = Web3::new(transport);
+        let contract = ZkSyncDeployedContract::version4(web3.eth(), [1u8; 20].into());
         let contract_addr = H160::from([1u8; 20]);
 
         let block_verified_topic = contract
