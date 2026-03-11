@@ -105,6 +105,10 @@ pub async fn submit_request(
         .map_err(warn_err)
         .map_err(ApiError::internal)?;
 
+    if params.tokens.is_empty() {
+        return Err(ApiError::bad_request("Token list must not be empty"));
+    }
+
     if params.tokens.len() > data.max_tokens_per_request as usize {
         return Err(ApiError::bad_request(
             "Maximum number of tokens per ForcedExit request exceeded",
