@@ -4,7 +4,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use web3::types::Address;
-
+use zksync_l1_event_listener::{
+    events::{BlockEvent, EventType},
+    events_state::EventsState,
+    rollup_ops::RollupOpsBlock,
+};
 use zksync_types::block::Block;
 use zksync_types::withdrawals::{WithdrawalEvent, WithdrawalPendingEvent};
 use zksync_types::{
@@ -14,9 +18,6 @@ use zksync_types::{
 
 use crate::{
     data_restore_driver::StorageUpdateState,
-    events::{BlockEvent, EventType},
-    events_state::EventsState,
-    rollup_ops::RollupOpsBlock,
     storage_interactor::{CachedTreeState, StoredTreeState},
 };
 
@@ -294,7 +295,7 @@ impl InMemoryStorageInteractor {
             committed_events,
             verified_events,
             last_watched_eth_block_number: inner.last_watched_block,
-            priority_op_data: Default::default(),
+            ..Default::default()
         }
     }
 
@@ -325,7 +326,7 @@ impl InMemoryStorageInteractor {
         None
     }
 
-    pub async fn update_tree_cache(&mut self, _block_number: BlockNumber, _tree_cache: String) {
+    pub async fn update_tree_cache(&mut self, _block_number: BlockNumber, _tree_cache: Vec<u8>) {
         // Inmemory storage doesn't support caching.
     }
 

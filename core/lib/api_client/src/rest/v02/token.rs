@@ -17,7 +17,7 @@ impl Client {
     }
 
     pub async fn token_by_id(&self, token: &TokenLike) -> Result<Response> {
-        self.get_with_scope(super::API_V02_SCOPE, &format!("tokens/{}", token))
+        self.get_with_scope(super::API_V02_SCOPE, format!("tokens/{}", token))
             .send()
             .await
     }
@@ -25,20 +25,20 @@ impl Client {
     pub async fn token_price(&self, token: &TokenLike, token_id_or_usd: &str) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("tokens/{}/priceIn/{}", token, token_id_or_usd),
+            format!("tokens/{}/priceIn/{}", token, token_id_or_usd),
         )
         .send()
         .await
     }
 
     pub async fn nft_by_id(&self, id: TokenId) -> Result<Response> {
-        self.get_with_scope(super::API_V02_SCOPE, &format!("tokens/nft/{}", id))
+        self.get_with_scope(super::API_V02_SCOPE, format!("tokens/nft/{}", id))
             .send()
             .await
     }
 
     pub async fn nft_owner_by_id(&self, id: TokenId) -> Result<Response> {
-        self.get_with_scope(super::API_V02_SCOPE, &format!("tokens/nft/{}/owner", id))
+        self.get_with_scope(super::API_V02_SCOPE, format!("tokens/nft/{}/owner", id))
             .send()
             .await
     }
@@ -46,7 +46,7 @@ impl Client {
     pub async fn nft_id_by_tx_hash(&self, tx_hash: TxHash) -> Result<Response> {
         self.get_with_scope(
             super::API_V02_SCOPE,
-            &format!("tokens/nft_id_by_tx_hash/{}", tx_hash.to_string()),
+            format!("tokens/nft_id_by_tx_hash/{}", tx_hash),
         )
         .send()
         .await

@@ -345,7 +345,7 @@ impl FloatConversions {
             exponent += 1;
         }
         let mut mantissa = integer / exponent_temp;
-        if integer % exponent_temp != 0 {
+        if !integer.is_multiple_of(exponent_temp) {
             mantissa += 1;
         }
 

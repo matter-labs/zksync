@@ -503,7 +503,7 @@ async fn transfers_with_different_timestamps() {
 
     let mut premature_transfer = correct_transfer.clone();
     if let Some(time_range) = premature_transfer.time_range.as_mut() {
-        time_range.valid_from = u64::max_value();
+        time_range.valid_from = u64::MAX;
     }
 
     let mut belated_transfer = correct_transfer.clone();

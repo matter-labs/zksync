@@ -1,5 +1,7 @@
 //! Target code to analyze tree performance.
 
+use std::time::Instant;
+
 use zksync_crypto::{
     merkle_tree::{RescueHasher, SparseMerkleTree},
     params::ACCOUNT_TREE_DEPTH,
@@ -14,14 +16,23 @@ const INITIALIZED_VALUES: usize = 100_000;
 const N_CYCLES: usize = 1_000;
 const VALUES_PER_CYCLE: usize = 1_000;
 
+macro_rules! measured {
+    ($descr: expr, $tree: expr, $call: tt) => {{
+        let start = Instant::now();
+        $call(&mut $tree);
+        println!("{}: took {:?}", $descr, start.elapsed());
+    }};
+}
+
 /// An entry point for analysis.
 pub(crate) fn analyze_tree() {
     let mut tree = Tree::new(ACCOUNT_TREE_DEPTH);
 
-    prepare(&mut tree);
-    stress_get(&mut tree);
-    stress_affected(&mut tree);
-    stress_new(&mut tree);
+    measured!("prepare", tree, prepare);
+    measured!("stress_get", tree, stress_get);
+    measured!("stress_affected", tree, stress_affected);
+    measured!("stress_new", tree, stress_new);
+    measured!("stress_get", tree, stress_get);
     drop(tree);
 }
 

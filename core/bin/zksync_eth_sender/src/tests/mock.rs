@@ -100,7 +100,7 @@ impl MockDatabase {
 impl DatabaseInterface for MockDatabase {
     /// Creates a new database connection, used as a stub
     /// and nothing will be sent through this connection.
-    async fn acquire_connection(&self) -> anyhow::Result<StorageProcessor<'_>> {
+    async fn acquire_connection(&self) -> anyhow::Result<StorageProcessor<'life0>> {
         StorageProcessor::establish_connection().await
     }
 
@@ -190,8 +190,8 @@ impl DatabaseInterface for MockDatabase {
             .read()
             .await
             .iter()
+            .filter(|&eth_op| !eth_op.confirmed)
             .cloned()
-            .filter(|eth_op| !eth_op.confirmed)
             .collect();
 
         Ok(unconfirmed_operations)

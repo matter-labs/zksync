@@ -20,7 +20,6 @@ pub mod messages;
 pub mod monitor;
 pub mod subscriber;
 
-#[derive(Debug)]
 struct AppState {
     server_monitor: Addr<ServerMonitor>,
 }
@@ -44,17 +43,19 @@ pub async fn run_event_server(config: ZkSyncConfig) {
         server_monitor: monitor.clone(),
     });
 
-    let server = HttpServer::new(move || {
+    let http_server = HttpServer::new(move || {
         App::new()
             .app_data(state.clone())
             .route("/", web::get().to(ws_index))
     })
     .bind(config.event_listener.ws_bind_addr())
-    .unwrap()
-    .run();
+    .unwrap();
+
+    let server = http_server.run();
+    //
     // Send the server handle to the monitor.
     monitor
-        .send(RegisterServerHandle(server.clone()))
+        .send(RegisterServerHandle(server.handle()))
         .await
         .unwrap();
     server.await.unwrap();

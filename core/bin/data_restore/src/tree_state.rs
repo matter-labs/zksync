@@ -1,7 +1,8 @@
-use crate::rollup_ops::RollupOpsBlock;
 use anyhow::format_err;
 use std::collections::HashMap;
+use zksync_crypto::merkle_tree::parallel_smt::SparseMerkleTreeSerializableCacheBN256;
 use zksync_crypto::{params::account_tree_depth, Fr};
+use zksync_l1_event_listener::rollup_ops::RollupOpsBlock;
 use zksync_state::{
     handler::TxHandler,
     state::{CollectedFee, OpSuccess, TransferOutcome, ZkSyncState},
@@ -83,17 +84,15 @@ impl TreeState {
     /// * `nfts` - Finalized NFTs
     ///
     pub fn restore_from_cache(
-        tree_cache: serde_json::Value,
+        tree_cache: Vec<u8>,
         account_map: AccountMap,
         current_block: Block,
         nfts: HashMap<TokenId, NFT>,
     ) -> Self {
         let mut account_id_by_address = HashMap::with_capacity(account_map.len());
         let mut balance_tree = AccountTree::new(account_tree_depth());
-
-        balance_tree.set_internals(
-            serde_json::from_value(tree_cache).expect("failed to deserialize tree cache"),
-        );
+        let cache = SparseMerkleTreeSerializableCacheBN256::decode_bincode(&tree_cache);
+        balance_tree.set_internals(cache);
 
         account_map.into_iter().for_each(|(account_id, account)| {
             account_id_by_address.insert(account.address, account_id);
@@ -595,10 +594,10 @@ impl TreeState {
 
 #[cfg(test)]
 mod test {
-    use crate::contract::v6::get_rollup_ops_from_data;
-    use crate::rollup_ops::RollupOpsBlock;
     use crate::tree_state::TreeState;
     use num::BigUint;
+    use zksync_l1_event_listener::contract::v6::get_rollup_ops_from_data;
+    use zksync_l1_event_listener::rollup_ops::RollupOpsBlock;
     use zksync_types::tx::ChangePubKey;
     use zksync_types::{
         AccountId, BlockNumber, ChangePubKeyOp, Deposit, DepositOp, ForcedExit, ForcedExitOp,

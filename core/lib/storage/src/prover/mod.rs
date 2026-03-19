@@ -226,7 +226,9 @@ impl<'a, 'c> ProverSchema<'a, 'c> {
                 .get_storage_block(block_number.into())
                 .await?;
             if let Some(block) = block {
-                let time = Utc.timestamp(block.timestamp.unwrap_or_default(), 0);
+                let time = Utc
+                    .timestamp_opt(block.timestamp.unwrap_or_default(), 0)
+                    .unwrap();
                 // It's almost impossible situation, but it could be triggered in tests
                 let duration = (Utc::now() - time).to_std().unwrap_or_default();
                 let labels = vec![("stage", stage.clone())];

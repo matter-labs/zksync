@@ -23,9 +23,11 @@ pub trait EthereumSigner: Send + Sync + Clone {
     async fn sign_message(&self, message: &[u8]) -> Result<TxEthSignature, SignerError>;
     async fn sign_transaction(&self, raw_tx: RawTransaction) -> Result<Vec<u8>, SignerError>;
     async fn get_address(&self) -> Result<Address, SignerError>;
-    async fn sign_typed_data<S: EIP712TypedStructure + Sync>(
+    async fn sign_typed_data<S>(
         &self,
         eip712_domain: &Eip712Domain,
         typed_struct: &S,
-    ) -> Result<PackedEthSignature, SignerError>;
+    ) -> Result<PackedEthSignature, SignerError>
+    where
+        S: EIP712TypedStructure + Sync;
 }

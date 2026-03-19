@@ -1,5 +1,8 @@
 // Built-in deps
 use std::str::FromStr;
+use zksync_l1_event_listener::{
+    events::BlockEvent, events_state::EventsState, rollup_ops::RollupOpsBlock,
+};
 // Workspace deps
 use zksync_storage::{
     data_restore::records::{NewBlockEvent, NewRollupOpsBlock},
@@ -17,9 +20,6 @@ use zksync_types::{
 use crate::storage_interactor::StoredTreeState;
 use crate::{
     data_restore_driver::StorageUpdateState,
-    events::BlockEvent,
-    events_state::EventsState,
-    rollup_ops::RollupOpsBlock,
     storage_interactor::{
         block_event_into_stored_block_event, stored_block_event_into_block_event,
         stored_ops_block_into_ops_block, CachedTreeState,
@@ -282,6 +282,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
             verified_events,
             last_watched_eth_block_number,
             priority_op_data,
+            ..Default::default()
         }
     }
 
@@ -372,7 +373,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
         let tree_cache = self
             .storage
             .chain()
-            .tree_cache_schema_json()
+            .tree_cache_schema_bincode()
             .get_account_tree_cache_block(last_block)
             .await
             .expect("Failed to query the database for the tree cache");
@@ -403,7 +404,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
         }
     }
 
-    pub async fn update_tree_cache(&mut self, block_number: BlockNumber, tree_cache: String) {
+    pub async fn update_tree_cache(&mut self, block_number: BlockNumber, tree_cache: Vec<u8>) {
         let mut transaction = self
             .storage
             .start_transaction()
@@ -412,7 +413,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
 
         transaction
             .chain()
-            .tree_cache_schema_json()
+            .tree_cache_schema_bincode()
             .remove_old_account_tree_cache(block_number)
             .await
             .expect("Failed to remove old tree cache");
@@ -421,7 +422,7 @@ impl<'a> DatabaseStorageInteractor<'a> {
         // since on conflict it does nothing.
         transaction
             .chain()
-            .tree_cache_schema_json()
+            .tree_cache_schema_bincode()
             .store_account_tree_cache(block_number, tree_cache)
             .await
             .expect("Failed to store new tree cache");

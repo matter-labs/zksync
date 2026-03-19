@@ -26,13 +26,13 @@ vlog = { path = "../../lib/vlog", version = "1.0" }
 
 zksync_core = { path = "../zksync_core", version = "1.0" }
 zksync_api = { path = "../zksync_api", version = "1.0" }
-actix-web = "4.0.0-beta.8"
+actix-web = "4.0.0"
 ethabi = "16.0.0"
 web3 = "0.18.0"
 log = "0.4"
 hex = "0.4"
 metrics = "0.17"
-chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 tokio = { version = "1", features = ["full"] }
 anyhow = "1.0"

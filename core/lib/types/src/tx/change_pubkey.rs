@@ -396,7 +396,16 @@ impl ChangePubKey {
         if let Some(eth_auth_data) = &self.eth_auth_data {
             match eth_auth_data {
                 ChangePubKeyEthAuthData::Onchain => true, // Should query Ethereum to check it
-                ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData { eth_signature, .. }) => {
+                ChangePubKeyEthAuthData::ECDSA(ChangePubKeyECDSAData {
+                    eth_signature,
+                    batch_hash,
+                }) => {
+                    // Reject non-zero batch_hash: the L1 witness encoding for ECDSA
+                    // (type 0x00) does not carry batch_hash, and the on-chain verifier
+                    // hardcodes bytes32(0).
+                    if !batch_hash.is_zero() {
+                        return false;
+                    }
                     let recovered_address = self.get_eth_signed_data().ok().and_then(|msg| {
                         eth_signature
                             .signature_recover_signer_from_raw_message(&msg)

@@ -1,29 +1,4 @@
-use std::future::Future;
-
-use web3::{
-    types::{Bytes, Log},
-    types::{H160, H256},
-    RequestId, Transport,
-};
-
-#[derive(Debug, Clone)]
-pub(crate) struct FakeTransport;
-
-impl Transport for FakeTransport {
-    type Out = Box<dyn Future<Output = Result<jsonrpc_core::Value, web3::Error>> + Send + Unpin>;
-
-    fn prepare(
-        &self,
-        _method: &str,
-        _params: Vec<jsonrpc_core::Value>,
-    ) -> (RequestId, jsonrpc_core::Call) {
-        unreachable!()
-    }
-
-    fn send(&self, _id: RequestId, _request: jsonrpc_core::Call) -> Self::Out {
-        unreachable!()
-    }
-}
+use web3::types::{Bytes, Log, H160, H256};
 
 pub(crate) fn u32_to_32bytes(value: u32) -> [u8; 32] {
     let mut bytes = [0u8; 32];

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::convert::From;
 
 // External uses
+use actix_web::body::BoxBody;
 use actix_web::{web::Data, HttpRequest, HttpResponse, Responder};
 use chrono::Utc;
 use qstring::QString;
@@ -24,6 +25,8 @@ pub enum ApiResult<R: Serialize> {
 }
 
 impl<R: Serialize> Responder for ApiResult<R> {
+    type Body = BoxBody;
+
     fn respond_to(self, req: &HttpRequest) -> HttpResponse {
         let data = req
             .app_data::<Data<SharedData>>()

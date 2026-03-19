@@ -1,17 +1,15 @@
+use web3::Transport;
 use web3::api::Eth;
 use web3::contract::Options;
 use web3::types::{Address, BlockId, U256};
-use web3::Transport;
 
 use zksync_contracts::{
     zksync_contract, zksync_contract_v0, zksync_contract_v1, zksync_contract_v2, zksync_contract_v3,
 };
 
-pub use crate::contract::utils::get_genesis_account;
-pub use crate::contract::version::ZkSyncContractVersion;
+pub use version::ZkSyncContractVersion;
 
 pub mod default;
-pub mod utils;
 pub mod v4;
 pub mod v6;
 pub mod version;

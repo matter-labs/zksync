@@ -234,10 +234,7 @@ async fn test_find_block_by_height_or_hash(mut storage: StorageProcessor<'_>) ->
             block_size: 0,
             commit_tx_hash: None,
             verify_tx_hash: None,
-            committed_at: chrono::DateTime::from_utc(
-                chrono::NaiveDateTime::from_timestamp(0, 0),
-                chrono::Utc,
-            ),
+            committed_at: chrono::DateTime::from_timestamp(0, 0).expect("valid timestamp"),
             verified_at: None,
         };
 
@@ -1160,7 +1157,7 @@ async fn test_get_block_transactions_page(mut storage: StorageProcessor<'_>) -> 
         setup.get_tx_hash(0, 9),
     ];
 
-    for (tx_hash, limit, direction, expected, test_name) in vec![
+    for (tx_hash, limit, direction, expected, test_name) in [
         (
             tx_hashes[0],
             5,

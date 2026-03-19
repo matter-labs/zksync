@@ -29,7 +29,7 @@ fn forced_exit_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
     };
     let (_, circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
 
-    let setup = || (circuit_account_tree.clone());
+    let setup = || circuit_account_tree.clone();
     b.iter_with_setup(setup, |mut circuit_account_tree| {
         ForcedExitWitnessBn256::apply_tx(&mut circuit_account_tree, &forced_exit_op);
     });
@@ -82,7 +82,7 @@ fn forced_exit_calculate_operations(b: &mut Bencher<'_>) {
     let witness = ForcedExitWitnessBn256::apply_tx(&mut circuit_account_tree, &forced_exit_op);
     let input =
         SigDataInput::from_forced_exit_op(&forced_exit_op).expect("SigDataInput creation failed");
-    let setup = || (input.clone());
+    let setup = || input.clone();
     b.iter_with_setup(setup, |input| {
         let _ops = black_box(witness.calculate_operations(input));
     });

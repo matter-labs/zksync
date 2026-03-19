@@ -6,25 +6,24 @@ use web3::{
     types::{H160, H256},
     Transport, Web3,
 };
+
 // Workspace deps
 use zksync_contracts::governance_contract;
 use zksync_crypto::{
     params::{MIN_NFT_TOKEN_ID, NFT_STORAGE_ACCOUNT_ADDRESS, NFT_STORAGE_ACCOUNT_ID, NFT_TOKEN_ID},
     Fr,
 };
+use zksync_l1_event_listener::{
+    contract::ZkSyncDeployedContract, eth_tx_helpers::get_ethereum_transaction,
+    events_state::EventsState, rollup_ops::RollupOpsBlock,
+};
 use zksync_types::{
     Account, AccountId, AccountMap, AccountUpdate, BlockNumber, SerialId, Token, TokenKind,
 };
 
 // Local deps
-use crate::{
-    contract::{get_genesis_account, ZkSyncDeployedContract},
-    eth_tx_helpers::get_ethereum_transaction,
-    events_state::EventsState,
-    rollup_ops::RollupOpsBlock,
-    storage_interactor::StorageInteractor,
-    tree_state::TreeState,
-};
+use crate::utils::get_genesis_account;
+use crate::{storage_interactor::StorageInteractor, tree_state::TreeState};
 
 /// Storage state update:
 /// - None - The state is updated completely last time - start from fetching the new events
@@ -257,10 +256,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         self.tree_state.state.root_hash();
         let tree_cache = self.tree_state.state.get_balance_tree().get_internals();
         interactor
-            .update_tree_cache(
-                self.tree_state.block_number,
-                serde_json::to_string(&tree_cache).expect("failed to serialize tree cache"),
-            )
+            .update_tree_cache(self.tree_state.block_number, tree_cache.encode_bincode())
             .await;
     }
 
@@ -345,7 +341,8 @@ impl<T: Transport> DataRestoreDriver<T> {
             vlog::info!("Last watched ethereum block: {:?}", last_watched_block);
 
             // Update events
-            if self.update_events_state(interactor).await {
+            let has_new_events = self.update_events_state(interactor).await;
+            if has_new_events {
                 // Update operations
                 let new_ops_blocks = self.update_operations_state(interactor).await;
 
@@ -358,7 +355,6 @@ impl<T: Transport> DataRestoreDriver<T> {
 
                     let total_verified_blocks =
                         self.zksync_contract.get_total_verified_blocks().await;
-
                     let last_verified_block = self.tree_state.block_number;
 
                     // We must update the Ethereum stats table to match the actual stored state
@@ -399,6 +395,18 @@ impl<T: Transport> DataRestoreDriver<T> {
                         }
                         break;
                     }
+                }
+            }
+
+            // In finite mode, check if the state is already up-to-date even when no new events
+            // were found (e.g. load_state_from_storage already processed all blocks).
+            if self.finite_mode {
+                let total_verified_blocks = self.zksync_contract.get_total_verified_blocks().await;
+                if *self.tree_state.block_number == total_verified_blocks {
+                    if self.final_hash.is_some() && !final_hash_was_found {
+                        panic!("Final hash was not met during the state restoring process");
+                    }
+                    break;
                 }
             }
 

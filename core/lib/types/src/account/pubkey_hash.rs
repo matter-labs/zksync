@@ -66,10 +66,14 @@ impl PubKeyHash {
     /// assert_eq!(pubkey_hash, PubKeyHash::zero());
     /// ```
     pub fn from_hex(s: &str) -> Result<Self, PubkeyHashDecodingError> {
-        if !s.starts_with("sync:") {
+        let prefix_size = if s.starts_with("sync:") {
+            5
+        } else if s.starts_with("0x") {
+            2
+        } else {
             return Err(PubkeyHashDecodingError::PrefixFormatError);
-        }
-        let bytes = hex::decode(&s[5..])?;
+        };
+        let bytes = hex::decode(&s[prefix_size..])?;
         Self::from_bytes(&bytes)
     }
 

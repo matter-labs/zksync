@@ -128,7 +128,7 @@ impl TxQueueBuilder {
 /// these queues, using the following rules:
 ///
 /// 1. If the amount of sent transactions is equal to the `MAX_PENDING_TXS` value,
-///   no transaction is yielded until some of already sent ones are committed.
+///    no transaction is yielded until some of already sent ones are committed.
 /// 2. Otherwise, transactions are yielded according to the following policy:
 ///   - If `execute` queue contains elements for some blocks, and `verify` operations
 ///     for corresponding blocks is committed, the `execute` operation is yielded.

@@ -2,7 +2,7 @@
 use std::{convert::TryFrom, sync::Arc};
 // External uses
 use actix::prelude::*;
-use actix_web::dev::Server;
+use actix_web::dev::ServerHandle;
 // Workspace uses
 use zksync_storage::listener::notification::StorageNotification;
 use zksync_types::event::{EventId, ZkSyncEvent};
@@ -21,7 +21,7 @@ pub struct Shutdown;
 /// may be used to gracefully shutdown the server.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
-pub struct RegisterServerHandle(pub Server);
+pub struct RegisterServerHandle(pub ServerHandle);
 
 #[derive(Debug, Message)]
 #[rtype(result = "()")]

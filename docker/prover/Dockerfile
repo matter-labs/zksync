@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:experimental
-FROM rust:1.72-bookworm as builder
+FROM rust:1.91-bookworm as builder
 WORKDIR /usr/src/zksync
 COPY . .
 RUN CARGO_HOME=./cargo cargo build --release

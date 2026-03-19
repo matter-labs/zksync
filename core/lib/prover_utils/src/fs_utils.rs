@@ -10,9 +10,9 @@ use zksync_crypto::Engine;
 
 pub fn get_keys_root_dir() -> PathBuf {
     let mut out_dir = PathBuf::new();
-    out_dir.push(&std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_owned()));
-    out_dir.push(&std::env::var("CHAIN_CIRCUIT_KEY_DIR").expect("KEY_DIR not set"));
-    out_dir.push(&format!(
+    out_dir.push(std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_owned()));
+    out_dir.push(std::env::var("CHAIN_CIRCUIT_KEY_DIR").expect("KEY_DIR not set"));
+    out_dir.push(format!(
         "account-{}_balance-{}",
         account_tree_depth(),
         balance_tree_depth(),
@@ -23,7 +23,7 @@ pub fn get_keys_root_dir() -> PathBuf {
 fn base_universal_setup_dir() -> Result<PathBuf, anyhow::Error> {
     let mut dir = PathBuf::new();
     // root is used by default for provers
-    dir.push(&std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_owned()));
+    dir.push(std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_owned()));
     dir.push("keys");
     dir.push("setup");
     anyhow::ensure!(dir.exists(), "Universal setup dir does not exits");
@@ -99,7 +99,7 @@ pub fn get_exodus_verification_key_path() -> PathBuf {
 
 pub fn get_block_verification_key_path(block_chunks: usize) -> PathBuf {
     let mut key = get_keys_root_dir();
-    key.push(&format!("verification_block_{}.key", block_chunks));
+    key.push(format!("verification_block_{}.key", block_chunks));
     key
 }
 
@@ -111,7 +111,7 @@ pub fn get_verifier_contract_key_path() -> PathBuf {
 
 pub fn get_recursive_verification_key_path(number_of_proofs: usize) -> PathBuf {
     let mut key = get_keys_root_dir();
-    key.push(&format!("recursive_{}.key", number_of_proofs));
+    key.push(format!("recursive_{}.key", number_of_proofs));
     key
 }
 

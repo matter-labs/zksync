@@ -2,7 +2,7 @@
 use std::collections::HashSet;
 // External uses
 use actix::prelude::*;
-use actix_web::dev::Server;
+use actix_web::dev::ServerHandle;
 // Workspace uses
 // Local uses
 use crate::messages::*;
@@ -12,7 +12,7 @@ use crate::subscriber::Subscriber;
 #[derive(Debug, Default)]
 pub struct ServerMonitor {
     addrs: HashSet<Addr<Subscriber>>,
-    server_handle: Option<Server>,
+    server_handle: Option<ServerHandle>,
 }
 
 impl ServerMonitor {
@@ -87,6 +87,7 @@ impl Handler<RegisterServerHandle> for ServerMonitor {
 impl Handler<Shutdown> for ServerMonitor {
     type Result = ();
 
+    #[allow(clippy::mutable_key_type)]
     fn handle(&mut self, _msg: Shutdown, ctx: &mut Self::Context) {
         // Since actix can't gracefully shutdown the WebSocket
         // server on its own, we have to send this message to

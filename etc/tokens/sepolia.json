@@ -1,14 +1,32 @@
 [
   {
-    "address": "0xFF82bB6DB46Ad45F017e2Dfb478102C7671B13b3",
-    "name": "wBTC",
-    "symbol": "wBTC",
-    "decimals": "8"
+    "name": "DAI",
+    "symbol": "DAI",
+    "decimals": 18,
+    "address": "0x1dDb18CE5BC0ffD9F9084aA7B99de219aa036c08"
   },
   {
-    "address": "0x403e5E352a0dF919b7d89e4C2edB21d75bf613fA",
-    "name": "USDC",
-    "symbol": "USDC",
-    "decimals": "18"
+    "name": "wBTC",
+    "symbol": "wBTC",
+    "decimals": 8,
+    "address": "0xf6a8e109Fd115Cc1B8Fb57636B6ce0583f07eb86"
+  },
+  {
+    "name": "BAT",
+    "symbol": "BAT",
+    "decimals": 18,
+    "address": "0x2a625dF55B2fC2Ba724AD8eca1057859A240E674"
+  },
+  {
+    "name": "GNT",
+    "symbol": "GNT",
+    "decimals": 18,
+    "address": "0x840397c294764500334d340aff139505A39CB9dd"
+  },
+  {
+    "name": "MLTT",
+    "symbol": "MLTT",
+    "decimals": 18,
+    "address": "0x1fB222F1DADb9Ee6fEea6eCd97BeE59F361c2008"
   }
 ]

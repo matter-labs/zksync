@@ -16,7 +16,7 @@
     ]
   },
   "scripts": {
-    "build:zksync-sdk": "yarn zksync prepublish",
+    "build:zksync-sdk": "yarn build:crypto && yarn zksync prepublish",
     "build:crypto": "yarn crypto build",
     "build:reading-tool": "yarn reading-tool build",
     "zksync": "yarn workspace zksync",

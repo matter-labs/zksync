@@ -23,68 +23,73 @@ be run directly via `diesel_cli`, but `zksync db-reset` should be used instead.
 -- Operations are associated with some block and every block can
 -- have multiple related operations with different action types
 -- (e.g. `commit` / `verify`).
-CREATE TABLE operations (
-    id bigserial PRIMARY KEY,
-    block_number BIGINT NOT NULL,
-    action_type TEXT NOT NULL,
-    created_at TIMESTAMP with time zone NOT NULL DEFAULT now(),
-    confirmed bool NOT NULL DEFAULT false
+CREATE TABLE operations
+(
+    id           bigserial PRIMARY KEY,
+    block_number BIGINT                   NOT NULL,
+    action_type  TEXT                     NOT NULL,
+    created_at   TIMESTAMP with time zone NOT NULL DEFAULT now(),
+    confirmed    bool                     NOT NULL DEFAULT false
 );
 
 -- Block header entry.
-CREATE TABLE blocks (
-    number BIGINT PRIMARY KEY,
-    root_hash BYTEA NOT NULL,
-    fee_account_id BIGINT NOT NULL,
+CREATE TABLE blocks
+(
+    number                      BIGINT PRIMARY KEY,
+    root_hash                   BYTEA  NOT NULL,
+    fee_account_id              BIGINT NOT NULL,
     unprocessed_prior_op_before BIGINT NOT NULL,
-    unprocessed_prior_op_after BIGINT NOT NULL,
-    block_size BIGINT NOT NULL
+    unprocessed_prior_op_after  BIGINT NOT NULL,
+    block_size                  BIGINT NOT NULL
 );
 
 -- Pending block header entry.
-CREATE TABLE pending_block (
+CREATE TABLE pending_block
+(
     -- Pending block ID
-    number BIGINT PRIMARY KEY NOT NULL,
-    chunks_left BIGINT NOT NULL,
-    unprocessed_priority_op_before BIGINT NOT NULL,
-    pending_block_iteration BIGINT NOT NULL
+    number                         BIGINT PRIMARY KEY NOT NULL,
+    chunks_left                    BIGINT             NOT NULL,
+    unprocessed_priority_op_before BIGINT             NOT NULL,
+    pending_block_iteration        BIGINT             NOT NULL
 );
 
 -- Table for the executed priority operations (e.g. deposit).
-CREATE TABLE executed_priority_operations (
+CREATE TABLE executed_priority_operations
+(
     -- sidechain block info
-    block_number BIGINT NOT NULL,
-    block_index INT NOT NULL,
+    block_number         BIGINT                   NOT NULL,
+    block_index          INT                      NOT NULL,
     -- operation data
-    operation jsonb NOT NULL,
+    operation            jsonb                    NOT NULL,
     -- operation metadata
-    from_account bytea NOT NULL,
-    to_account bytea NOT NULL,
-    priority_op_serialid BIGINT NOT NULL,
-    deadline_block BIGINT NOT NULL,
-    eth_hash bytea NOT NULL,
-    eth_block BIGINT NOT NULL,
-    created_at timestamp with time zone not null,
+    from_account         bytea                    NOT NULL,
+    to_account           bytea                    NOT NULL,
+    priority_op_serialid BIGINT                   NOT NULL,
+    deadline_block       BIGINT                   NOT NULL,
+    eth_hash             bytea                    NOT NULL,
+    eth_block            BIGINT                   NOT NULL,
+    created_at           timestamp with time zone not null,
     PRIMARY KEY (eth_hash)
 );
 
 -- Table for the executed common operations (e.g. transfer).
-CREATE TABLE executed_transactions (
+CREATE TABLE executed_transactions
+(
     -- sidechain block info
-    block_number BIGINT NOT NULL,
-    block_index INT,
+    block_number            BIGINT                   NOT NULL,
+    block_index             INT,
     -- operation data
-    tx jsonb NOT NULL,
-    operation jsonb NOT NULL,
+    tx                      jsonb                    NOT NULL,
+    operation               jsonb                    NOT NULL,
     -- operation metadata
-    tx_hash bytea NOT NULL,
-    from_account bytea NOT NULL,
-    to_account bytea,
-    success bool NOT NULL,
-    fail_reason TEXT,
-    primary_account_address bytea NOT NULL,
-    nonce BIGINT NOT NULL,
-    created_at TIMESTAMP with time zone NOT NULL,
+    tx_hash                 bytea                    NOT NULL,
+    from_account            bytea                    NOT NULL,
+    to_account              bytea,
+    success                 bool                     NOT NULL,
+    fail_reason             TEXT,
+    primary_account_address bytea                    NOT NULL,
+    nonce                   BIGINT                   NOT NULL,
+    created_at              TIMESTAMP with time zone NOT NULL,
     PRIMARY KEY (tx_hash)
 );
 
@@ -94,10 +99,11 @@ CREATE TABLE executed_transactions (
 
 -- Token types known to the ZKSync node.
 -- By default has the ETH token only (see the `INSERT` statement in the end of the file).
-CREATE TABLE tokens (
-    id INTEGER NOT NULL PRIMARY KEY,
-    address TEXT NOT NULL,
-    symbol TEXT NOT NULL,
+CREATE TABLE tokens
+(
+    id       INTEGER  NOT NULL PRIMARY KEY,
+    address  TEXT     NOT NULL,
+    symbol   TEXT     NOT NULL,
     decimals SMALLINT NOT NULL
 );
 
@@ -106,49 +112,53 @@ CREATE TABLE tokens (
 -- ---------------- --
 
 -- Table for the ZKSync accounts.
-CREATE TABLE accounts (
-    id BIGINT NOT NULL PRIMARY KEY,
-    last_block BIGINT NOT NULL,
-    nonce BIGINT NOT NULL,
-    address bytea NOT NULL,
-    pubkey_hash bytea NOT NULL
+CREATE TABLE accounts
+(
+    id          BIGINT NOT NULL PRIMARY KEY,
+    last_block  BIGINT NOT NULL,
+    nonce       BIGINT NOT NULL,
+    address     bytea  NOT NULL,
+    pubkey_hash bytea  NOT NULL
 );
 
 -- Table for the account balance change operations.
-CREATE TABLE account_balance_updates (
-    balance_update_id serial NOT NULL,
-    account_id BIGINT NOT NULL,
-    block_number BIGINT NOT NULL,
-    coin_id INTEGER NOT NULL REFERENCES tokens(id) ON UPDATE CASCADE,
-    old_balance NUMERIC NOT NULL,
-    new_balance NUMERIC NOT NULL,
-    old_nonce BIGINT NOT NULL,
-    new_nonce BIGINT NOT NULL,
-    update_order_id INTEGER NOT NULL,
+CREATE TABLE account_balance_updates
+(
+    balance_update_id serial  NOT NULL,
+    account_id        BIGINT  NOT NULL,
+    block_number      BIGINT  NOT NULL,
+    coin_id           INTEGER NOT NULL REFERENCES tokens (id) ON UPDATE CASCADE,
+    old_balance       NUMERIC NOT NULL,
+    new_balance       NUMERIC NOT NULL,
+    old_nonce         BIGINT  NOT NULL,
+    new_nonce         BIGINT  NOT NULL,
+    update_order_id   INTEGER NOT NULL,
     PRIMARY KEY (balance_update_id)
 );
 
 -- Table for the account creation operations.
-CREATE TABLE account_creates (
-    account_id BIGINT NOT NULL,
-    is_create bool NOT NULL,
-    block_number BIGINT NOT NULL,
-    address bytea NOT NULL,
-    nonce BIGINT NOT NULL,
+CREATE TABLE account_creates
+(
+    account_id      BIGINT  NOT NULL,
+    is_create       bool    NOT NULL,
+    block_number    BIGINT  NOT NULL,
+    address         bytea   NOT NULL,
+    nonce           BIGINT  NOT NULL,
     update_order_id INTEGER NOT NULL,
     PRIMARY KEY (account_id, block_number)
 );
 
 -- Table for the account public key change operations.
-CREATE TABLE account_pubkey_updates (
-    pubkey_update_id serial NOT NULL,
-    update_order_id INTEGER NOT NULL,
-    account_id BIGINT NOT NULL,
-    block_number BIGINT NOT NULL,
-    old_pubkey_hash bytea NOT NULL,
-    new_pubkey_hash bytea NOT NULL,
-    old_nonce BIGINT NOT NULL,
-    new_nonce BIGINT NOT NULL,
+CREATE TABLE account_pubkey_updates
+(
+    pubkey_update_id serial  NOT NULL,
+    update_order_id  INTEGER NOT NULL,
+    account_id       BIGINT  NOT NULL,
+    block_number     BIGINT  NOT NULL,
+    old_pubkey_hash  bytea   NOT NULL,
+    new_pubkey_hash  bytea   NOT NULL,
+    old_nonce        BIGINT  NOT NULL,
+    new_nonce        BIGINT  NOT NULL,
     PRIMARY KEY (pubkey_update_id)
 );
 
@@ -156,10 +166,11 @@ CREATE TABLE account_pubkey_updates (
 -- but every balance account has must have an unique token (meaning that
 -- there may be user with `ETH` and `ERC-20` balances, but not with `ETH`
 -- and `ETH` balances).
-CREATE TABLE balances (
-    account_id BIGINT REFERENCES accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
-    coin_id INTEGER REFERENCES tokens(id) ON UPDATE CASCADE,
-    balance NUMERIC NOT NULL DEFAULT 0,
+CREATE TABLE balances
+(
+    account_id BIGINT REFERENCES accounts (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    coin_id    INTEGER REFERENCES tokens (id) ON UPDATE CASCADE,
+    balance    NUMERIC NOT NULL DEFAULT 0,
     PRIMARY KEY (account_id, coin_id)
 );
 
@@ -167,31 +178,32 @@ CREATE TABLE balances (
 -- Data restore section --
 -- -------------------- --
 
-CREATE TABLE data_restore_events_state (
-    id SERIAL PRIMARY KEY,
-    block_type TEXT NOT NULL,
-    transaction_hash BYTEA NOT NULL,
-    block_num BIGINT NOT NULL
+CREATE TABLE data_restore_events_state
+(
+    id               SERIAL PRIMARY KEY,
+    block_type       TEXT   NOT NULL,
+    transaction_hash BYTEA  NOT NULL,
+    block_num        BIGINT NOT NULL
 );
 
 CREATE TABLE data_restore_storage_state_update
 (
-    id SERIAL PRIMARY KEY,
+    id            SERIAL PRIMARY KEY,
     storage_state TEXT NOT NULL
 );
 
 CREATE TABLE data_restore_last_watched_eth_block
 (
-    id SERIAL PRIMARY KEY,
+    id           SERIAL PRIMARY KEY,
     block_number TEXT NOT NULL
 );
 
 -- Table for the executed franklin operations, used by
 CREATE TABLE data_restore_rollup_ops
 (
-    id SERIAL PRIMARY KEY,
-    block_num BIGINT NOT NULL,
-    operation JSONB  NOT NULL,
+    id          SERIAL PRIMARY KEY,
+    block_num   BIGINT NOT NULL,
+    operation   JSONB  NOT NULL,
     fee_account BIGINT NOT NULL
 );
 
@@ -201,28 +213,31 @@ CREATE TABLE data_restore_rollup_ops
 -- -------------- --
 
 -- Stored proofs for the blocks.
-CREATE TABLE proofs (
+CREATE TABLE proofs
+(
     block_number bigserial PRIMARY KEY,
-    proof jsonb NOT NULL,
-    created_at TIMESTAMP with time zone NOT NULL DEFAULT now()
+    proof        jsonb                    NOT NULL,
+    created_at   TIMESTAMP with time zone NOT NULL DEFAULT now()
 );
 
 -- Ongoing block proving jobs.
-CREATE TABLE prover_runs (
-    id serial PRIMARY KEY,
-    block_number BIGINT NOT NULL,
-    worker TEXT,
-    created_at TIMESTAMP with time zone NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP with time zone NOT NULL DEFAULT now()
+CREATE TABLE prover_runs
+(
+    id           serial PRIMARY KEY,
+    block_number BIGINT                   NOT NULL,
+    worker       TEXT,
+    created_at   TIMESTAMP with time zone NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMP with time zone NOT NULL DEFAULT now()
 );
 
 -- List of currently available provers.
-CREATE TABLE active_provers (
-    id serial PRIMARY KEY,
-    worker TEXT NOT NULL,
+CREATE TABLE active_provers
+(
+    id         serial PRIMARY KEY,
+    worker     TEXT                     NOT NULL,
     created_at TIMESTAMP with time zone NOT NULL DEFAULT now(),
     stopped_at TIMESTAMP with time zone,
-    block_size BIGINT NOT NULL
+    block_size BIGINT                   NOT NULL
 );
 
 -- --------------------- --
@@ -231,11 +246,12 @@ CREATE TABLE active_provers (
 
 -- Unique server configuration entry.
 -- Expected to be initialized separately, e.g. by `zksync db-reset` or `zksync init` command.
-CREATE TABLE server_config (
+CREATE TABLE server_config
+(
     -- enforce single record
-    id bool PRIMARY KEY NOT NULL DEFAULT true,
+    id                bool PRIMARY KEY NOT NULL DEFAULT true,
     CONSTRAINT single_server_config CHECK (id),
-    contract_addr TEXT,
+    contract_addr     TEXT,
     gov_contract_addr TEXT
 );
 
@@ -244,55 +260,60 @@ CREATE TABLE server_config (
 -- ----------- --
 
 -- Stored Ethereum anchoring operations.
-CREATE TABLE eth_operations (
-    id bigserial PRIMARY KEY,
-    nonce BIGINT NOT NULL,
-    confirmed bool NOT NULL DEFAULT false,
-    raw_tx bytea NOT NULL,
-    op_type TEXT NOT NULL,
-    final_hash bytea DEFAULT NULL,
-    last_deadline_block BIGINT NOT NULL,
+CREATE TABLE eth_operations
+(
+    id                  bigserial PRIMARY KEY,
+    nonce               BIGINT  NOT NULL,
+    confirmed           bool    NOT NULL DEFAULT false,
+    raw_tx              bytea   NOT NULL,
+    op_type             TEXT    NOT NULL,
+    final_hash          bytea            DEFAULT NULL,
+    last_deadline_block BIGINT  NOT NULL,
     last_used_gas_price NUMERIC NOT NULL
 );
 
 -- Data related to the interaction with the Ethereum network.
-CREATE TABLE eth_parameters (
+CREATE TABLE eth_parameters
+(
     -- enforce single record
-    id bool PRIMARY KEY NOT NULL DEFAULT true,
+    id              bool PRIMARY KEY NOT NULL DEFAULT true,
     -- Locally stored Ethereum nonce
-    nonce BIGINT NOT NULL,
+    nonce           BIGINT           NOT NULL,
     -- Last gas price limit used by GasAdjuster
-    gas_price_limit BIGINT NOT NULL,
+    gas_price_limit BIGINT           NOT NULL,
     -- Gathered operations statistics
-    commit_ops BIGINT NOT NULL,
-    verify_ops BIGINT NOT NULL,
-    withdraw_ops BIGINT NOT NULL
+    commit_ops      BIGINT           NOT NULL,
+    verify_ops      BIGINT           NOT NULL,
+    withdraw_ops    BIGINT           NOT NULL
 );
 
 -- Table connection `eth_operations` and `operations` table.
 -- Each entry provides a mapping between the Ethereum transaction and the ZK Sync operation.
-CREATE TABLE eth_ops_binding (
-    id bigserial PRIMARY KEY,
-    op_id bigserial NOT NULL REFERENCES operations(id),
-    eth_op_id bigserial NOT NULL REFERENCES eth_operations(id)
+CREATE TABLE eth_ops_binding
+(
+    id        bigserial PRIMARY KEY,
+    op_id     bigserial NOT NULL REFERENCES operations (id),
+    eth_op_id bigserial NOT NULL REFERENCES eth_operations (id)
 );
 
 -- Table storing all the sent Ethereum transaction hashes.
-CREATE TABLE eth_tx_hashes (
-    id bigserial PRIMARY KEY,
-    eth_op_id bigserial NOT NULL REFERENCES eth_operations(id),
-    tx_hash bytea NOT NULL
+CREATE TABLE eth_tx_hashes
+(
+    id        bigserial PRIMARY KEY,
+    eth_op_id bigserial NOT NULL REFERENCES eth_operations (id),
+    tx_hash   bytea     NOT NULL
 );
 
 -- --------------- --
 -- Mempool section --
 -- --------------- --
-CREATE TABLE mempool_txs (
-    id bigserial PRIMARY KEY,
+CREATE TABLE mempool_txs
+(
+    id      bigserial PRIMARY KEY,
     -- Hash of the transaction
-    tx_hash TEXT NOT NULL,
+    tx_hash TEXT  NOT NULL,
     -- Transaction contents
-    tx jsonb NOT NULL
+    tx      jsonb NOT NULL
 );
 
 -- --------------- --
@@ -329,8 +350,8 @@ CREATE INDEX executed_priority_operations_to_account_index ON executed_priority_
 -- ------------------ --
 
 -- `tablefunc` enables `crosstab` (pivot)
-CREATE EXTENSION IF NOT EXISTS tablefunc;
-
+-- CREATE EXTENSION IF NOT EXISTS tablefunc;
+--
 -- ---------------------- --
 -- Data insertion section --
 -- ---------------------- --

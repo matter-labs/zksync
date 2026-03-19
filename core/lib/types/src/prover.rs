@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use thiserror::Error;
 use zksync_basic_types::BlockNumber;
 
@@ -60,12 +61,13 @@ pub enum ProverJobType {
     AggregatedProof,
 }
 
-impl ToString for ProverJobType {
-    fn to_string(&self) -> String {
-        match self {
-            ProverJobType::SingleProof => String::from("SINGLE_PROOF"),
-            ProverJobType::AggregatedProof => String::from("AGGREGATED_PROOF"),
-        }
+impl Display for ProverJobType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let res = match self {
+            ProverJobType::SingleProof => "SINGLE_PROOF",
+            ProverJobType::AggregatedProof => "AGGREGATED_PROOF",
+        };
+        write!(f, "{}", res)
     }
 }
 

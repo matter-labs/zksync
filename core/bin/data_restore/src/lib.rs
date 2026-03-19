@@ -1,22 +1,19 @@
-pub mod contract;
 pub mod data_restore_driver;
 pub mod database_storage_interactor;
-pub mod eth_tx_helpers;
-pub mod events;
-pub mod events_state;
 pub mod inmemory_storage_interactor;
-pub mod rollup_ops;
 pub mod storage_interactor;
 pub mod tree_state;
 
+pub mod config;
 #[cfg(test)]
 mod tests;
+pub mod utils;
 
 use crate::storage_interactor::StorageInteractor;
 use zksync_types::{tokens::get_genesis_token_list, TokenId};
 
 // How many blocks we will process at once.
-pub const ETH_BLOCKS_STEP: u64 = 100;
+pub const ETH_BLOCKS_STEP: u64 = 10000;
 pub const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
 pub async fn add_tokens_to_storage(interactor: &mut StorageInteractor<'_>, eth_network: &str) {

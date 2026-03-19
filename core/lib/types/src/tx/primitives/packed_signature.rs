@@ -1,6 +1,7 @@
 use crate::Engine;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
+use zksync_crypto::bellman::Field;
 use zksync_crypto::{
     franklin_crypto::{
         alt_babyjubjub::{edwards, fs::FsRepr, AltJubjubBn256, JubjubEngine},
@@ -40,6 +41,15 @@ impl PackedSignature {
             <Engine as JubjubEngine>::Fs::from_repr(s_repr).map_err(DeserializeError::RestoreS)?;
 
         Ok(Self(Signature { r, s }))
+    }
+}
+
+impl Default for PackedSignature {
+    fn default() -> Self {
+        Self(Signature {
+            r: edwards::Point::zero(),
+            s: <Engine as JubjubEngine>::Fs::zero(),
+        })
     }
 }
 

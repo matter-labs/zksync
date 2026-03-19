@@ -1,13 +1,16 @@
 use std::str::FromStr;
 use structopt::StructOpt;
 
+mod account_tree_target;
 mod tree_target;
 
 /// Target to analyze.
 #[derive(Debug)]
 enum Target {
-    /// Merkle tree.
+    /// Merkle tree (raw).
     Tree,
+    /// Account tree.
+    AccountTree,
 }
 
 impl FromStr for Target {
@@ -16,6 +19,7 @@ impl FromStr for Target {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let target = match s {
             "tree" | "merkle-tree" => Self::Tree,
+            "account-tree" => Self::AccountTree,
             _ => return Err("Unknown taget. Available options are: tree"),
         };
 
@@ -40,6 +44,9 @@ fn main() {
     match options.target {
         Target::Tree => {
             tree_target::analyze_tree();
+        }
+        Target::AccountTree => {
+            account_tree_target::analyze_tree();
         }
     }
 }

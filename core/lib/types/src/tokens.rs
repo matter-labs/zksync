@@ -123,17 +123,12 @@ pub struct Token {
     pub is_nft: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Default)]
 pub enum TokenKind {
+    #[default]
     ERC20,
     NFT,
     None,
-}
-
-impl Default for TokenKind {
-    fn default() -> Self {
-        Self::ERC20
-    }
 }
 
 impl Token {

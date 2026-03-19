@@ -13,7 +13,7 @@ const SQL = () => `psql "${process.env.DATABASE_URL}" -c`;
 export async function reset() {
     await utils.confirmAction();
     await wait();
-    await drop();
+    // await drop();
     await setup();
     await insert.contract();
     await insert.ethData();
@@ -53,6 +53,7 @@ export async function basicSetup() {
         // Remote database, we can't show the contents.
         console.log(`WARNING! Using prod db!`);
     }
+    console.log(process.env.DATABASE_URL);
     await utils.exec('diesel database setup');
     await utils.exec('diesel migration run');
     fs.unlinkSync('src/schema.rs.generated');

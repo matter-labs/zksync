@@ -449,8 +449,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let start = Instant::now();
         let params = self.load_eth_params().await?;
 
-        let gas_price_limit =
-            U256::try_from(params.gas_price_limit).expect("Negative gas limit value stored in DB");
+        let gas_price_limit = U256::from(params.gas_price_limit);
 
         metrics::histogram!("sql.ethereum.load_gas_price_limit", start.elapsed());
         Ok(gas_price_limit)
@@ -460,9 +459,7 @@ impl<'a, 'c> EthereumSchema<'a, 'c> {
         let start = Instant::now();
         let params = self.load_eth_params().await?;
 
-        let average_gas_price = params
-            .average_gas_price
-            .map(|price| U256::try_from(price).expect("Negative average gas price stored in DB"));
+        let average_gas_price = params.average_gas_price.map(U256::from);
 
         metrics::histogram!("sql.ethereum.load_average_gas_price", start.elapsed());
         Ok(average_gas_price)

@@ -28,7 +28,7 @@ impl TimeHistogram {
         // Ranges from 1 second to 20 seconds with windows of 1 second.
         let sec_ranges = (1..20).map(|window_idx| Self::window(window_idx, 1000));
         // Range for (20 sec; MAX).
-        let rest_range = std::iter::once((20_000u64, u64::max_value()));
+        let rest_range = std::iter::once((20_000u64, u64::MAX));
 
         let ranges: Vec<_> = sub_sec_ranges.chain(sec_ranges).chain(rest_range).collect();
         let mut histogram = BTreeMap::new();
@@ -181,7 +181,7 @@ mod tests {
         let histogram = TimeHistogram::new();
         // Check that we start at 0 and end at max.
         assert_eq!(histogram.ranges[0].0, 0);
-        assert_eq!(histogram.ranges.last().unwrap().1, u64::max_value());
+        assert_eq!(histogram.ranges.last().unwrap().1, u64::MAX);
 
         // Check that we go through all the range without gaps.
         for idx in 0..(histogram.ranges.len() - 1) {

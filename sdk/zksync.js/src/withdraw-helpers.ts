@@ -6,12 +6,14 @@ import { MULTICALL_INTERFACE } from './utils';
 declare module './wallet' {
     interface Wallet {
         withdrawPendingBalance(from: Address, token: TokenLike, amount?: BigNumberish): Promise<ContractTransaction>;
+
         withdrawPendingBalances(
             addresses: Address[],
             tokens: TokenLike[],
             multicallParams: MulticallParams,
             amounts?: BigNumberish[]
         ): Promise<ContractTransaction>;
+
         withdrawPendingNFTBalance(tokenId: number): Promise<ContractTransaction>;
     }
 }
@@ -32,6 +34,7 @@ function checkEthProvider(ethersWallet: ethers.Signer) {
 // https://github.com/makerdao/multicall
 function getMulticallAddressByNetwork(network: Network) {
     switch (network) {
+        case 'sepolia':
         case 'rinkeby-beta':
             return '0x42ad527de7d4e9d9d011ac45b31d8551f8fe9821';
         case 'goerli':

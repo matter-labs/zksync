@@ -16,7 +16,7 @@ use zksync_types::block::Block;
 #[async_trait::async_trait]
 pub(super) trait DatabaseInterface {
     /// Returns connection to the database.
-    async fn acquire_connection(&self) -> anyhow::Result<StorageProcessor<'_>>;
+    async fn acquire_connection<'a>(&'a self) -> anyhow::Result<StorageProcessor<'a>>;
 
     /// Loads the unconfirmed and unprocessed operations from the database.
     /// Unconfirmed operations are Ethereum operations that were started, but not confirmed yet.
@@ -123,7 +123,7 @@ impl Database {
 
 #[async_trait::async_trait]
 impl DatabaseInterface for Database {
-    async fn acquire_connection(&self) -> anyhow::Result<StorageProcessor<'_>> {
+    async fn acquire_connection<'a>(&'a self) -> anyhow::Result<StorageProcessor<'a>> {
         let connection = self.db_pool.access_storage().await?;
 
         Ok(connection)

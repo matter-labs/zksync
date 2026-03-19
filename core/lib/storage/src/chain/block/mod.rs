@@ -511,12 +511,7 @@ impl<'a, 'c> BlockSchema<'a, 'c> {
         let hash_bytes = conversion::decode_hex_with_prefix(&query).unwrap_or_default();
 
         // If the input can be interpreted as integer, add the block number lookup part.
-        let block_number = if let Ok(int_query) = query.parse::<i64>() {
-            int_query
-        } else {
-            // It doesn't look like a number, provide -1 for no match.
-            -1i64
-        };
+        let block_number = query.parse::<i64>().unwrap_or(-1i64);
 
         // If input doesn't look like hash or integer, no query
         // should be performed.

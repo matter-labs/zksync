@@ -34,7 +34,8 @@ async function main() {
               "m/44'/60'/0'/0/1"
           ).connect(provider);
 
-    const gasPrice = args.gasPrice ? parseUnits(args.gasPrice, 'gwei') : await provider.getGasPrice();
+    let gasPrice = args.gasPrice ? parseUnits(args.gasPrice, 'gwei') : await provider.getGasPrice();
+    gasPrice = gasPrice.div(100).mul(140);
     console.log(`Using gas price: ${formatUnits(gasPrice, 'gwei')} gwei`);
 
     if (args.nonce) {
@@ -45,6 +46,8 @@ async function main() {
         console.log(`Using nonce: ${args.nonce}`);
         args.nonce = parseInt(args.nonce);
     }
+
+    console.log(await wallet.provider.getTransactionCount(wallet.address));
 
     const governorAddress = args.governor ? args.governor : wallet.address;
     console.log(`Deploying for governor: ${governorAddress}`);

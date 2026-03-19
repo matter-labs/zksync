@@ -1,19 +1,16 @@
-use serde::Deserialize;
 use structopt::StructOpt;
 use web3::transports::Http;
-use zksync_config::configs::{ChainConfig, ContractsConfig as EnvContractsConfig, ETHClientConfig};
+use zksync_config::configs::ETHClientConfig;
 use zksync_crypto::convert::FeConvert;
 use zksync_storage::ConnectionPool;
-use zksync_types::{Address, H256};
 
 use web3::Web3;
-use zksync_data_restore::contract::ZkSyncDeployedContract;
 use zksync_data_restore::{
     add_tokens_to_storage, data_restore_driver::DataRestoreDriver,
     database_storage_interactor::DatabaseStorageInteractor, storage_interactor::StorageInteractor,
     END_ETH_BLOCKS_OFFSET, ETH_BLOCKS_STEP,
 };
-use zksync_types::network::Network;
+use zksync_l1_event_listener::{config::ContractsConfig, contract::ZkSyncDeployedContract};
 
 #[derive(StructOpt)]
 #[structopt(
@@ -47,43 +44,10 @@ struct Opt {
     config_path: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ContractsConfig {
-    eth_network: Network,
-    governance_addr: Address,
-    genesis_tx_hash: H256,
-    contract_addr: Address,
-    init_contract_version: u32,
-    upgrade_eth_blocks: Vec<u64>,
-}
-
-impl ContractsConfig {
-    pub fn from_file(path: &str) -> Self {
-        let content =
-            std::fs::read_to_string(path).expect("Unable to find the specified config file");
-        serde_json::from_str(&content).expect("Invalid configuration file provided")
-    }
-
-    pub fn from_env() -> Self {
-        let contracts_opts = EnvContractsConfig::from_env();
-        let chain_opts = ChainConfig::from_env();
-
-        Self {
-            eth_network: chain_opts.eth.network,
-            governance_addr: contracts_opts.governance_addr,
-            genesis_tx_hash: contracts_opts.genesis_tx_hash,
-            contract_addr: contracts_opts.contract_addr,
-            init_contract_version: contracts_opts.init_contract_version,
-            upgrade_eth_blocks: contracts_opts.upgrade_eth_blocks,
-        }
-    }
-}
-
 #[tokio::main]
 async fn main() {
     vlog::info!("Restoring zkSync state from the contract");
     let _vlog_guard = vlog::init();
-    let connection_pool = ConnectionPool::new(Some(1));
 
     let opt = Opt::from_args();
 
@@ -92,8 +56,6 @@ async fn main() {
         config_opts.web3_url()
     });
 
-    let transport = Http::new(&web3_url).expect("failed to start web3 transport");
-
     let config = opt
         .config_path
         .map(|path| ContractsConfig::from_file(&path))
@@ -101,6 +63,8 @@ async fn main() {
 
     vlog::info!("Using the following config: {:#?}", config);
 
+    let connection_pool = ConnectionPool::new(Some(1));
+    let transport = Http::new(&web3_url).expect("failed to start web3 transport");
     let finite_mode = opt.finite;
     let final_hash = if finite_mode {
         opt.final_hash

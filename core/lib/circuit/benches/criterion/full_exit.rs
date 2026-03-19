@@ -29,7 +29,7 @@ fn full_exit_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
     };
     let (_, circuit_account_tree) = ZkSyncStateGenerator::generate(&accounts);
 
-    let setup = || (circuit_account_tree.clone());
+    let setup = || circuit_account_tree.clone();
     b.iter_with_setup(setup, |mut circuit_account_tree| {
         FullExitWitnessBn256::apply_tx(&mut circuit_account_tree, &(full_exit_op.clone(), true));
     });

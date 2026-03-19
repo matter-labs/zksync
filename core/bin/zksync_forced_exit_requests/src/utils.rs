@@ -80,6 +80,6 @@ mod test {
         let id: u32 = 211;
         let expected_amount = ten.pow(100);
         let amount = expected_amount.clone().add(id);
-        test_extraction_for_id_amount(amount, 3, id.try_into().unwrap(), expected_amount);
+        test_extraction_for_id_amount(amount, 3, id.into(), expected_amount);
     }
 }

@@ -64,6 +64,7 @@ localConfig.EASY_EXODUS = process.env.CONTRACTS_TEST_EASY_EXODUS === 'true';
 
 const contractDefs = {
     goerli: testnetConfig,
+    sepolia: testnetConfig,
     rinkeby: testnetConfig,
     ropsten: testnetConfig,
     mainnet: prodConfig,

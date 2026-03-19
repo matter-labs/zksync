@@ -638,7 +638,7 @@ impl TxSender {
 
     pub async fn submit_txs_batch(
         &self,
-        txs: Vec<TxWithSignature>,
+        mut txs: Vec<TxWithSignature>,
         eth_signatures: Option<EthBatchSignatures>,
         extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<SubmitBatchResponse, SubmitError> {
@@ -809,16 +809,22 @@ impl TxSender {
             }
         }
 
-        for tx in txs.iter() {
-            if let ZkSyncTx::Swap(swap) = &tx.tx {
-                if tx.signature.is_single() {
-                    return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+        for tx in txs.iter_mut() {
+            match &mut tx.tx {
+                ZkSyncTx::Swap(swap) => {
+                    if tx.signature.is_single() {
+                        return Err(SubmitError::TxAdd(TxAddError::MissingEthSignature));
+                    }
+                    let signatures = tx.signature.orders_signatures();
+                    self.verify_order_eth_signature(&swap.orders.0, signatures.0.clone())
+                        .await?;
+                    self.verify_order_eth_signature(&swap.orders.1, signatures.1.clone())
+                        .await?;
                 }
-                let signatures = tx.signature.orders_signatures();
-                self.verify_order_eth_signature(&swap.orders.0, signatures.0.clone())
-                    .await?;
-                self.verify_order_eth_signature(&swap.orders.1, signatures.1.clone())
-                    .await?;
+                ZkSyncTx::ChangePubKey(change_pub_key) => {
+                    change_pub_key.chain_id = Some(self.chain_id);
+                }
+                _ => {}
             }
         }
 

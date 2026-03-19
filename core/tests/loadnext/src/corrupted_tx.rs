@@ -265,7 +265,7 @@ impl Corrupted for (ZkSyncTx, Option<PackedEthSignature>) {
 
     fn too_big_amount(mut self, eth_pk: H256, token_symbol: &str, decimals: u8) -> Self {
         // We want to fail tx because of the amount, not because of packability.
-        let big_amount = closest_packable_token_amount(&BigUint::from(u128::max_value() >> 32));
+        let big_amount = closest_packable_token_amount(&BigUint::from(u128::MAX >> 32));
         match &mut self.0 {
             ZkSyncTx::ChangePubKey(_tx) => unreachable!("CPK doesn't have amount"),
             ZkSyncTx::ForcedExit(_tx) => unreachable!("ForcedExit doesn't have amount"),

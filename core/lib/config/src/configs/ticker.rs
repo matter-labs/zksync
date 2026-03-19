@@ -22,6 +22,7 @@ pub struct TickerConfig {
     pub coinmarketcap_base_url: String,
     /// URL of CoinGecko API. Can be set to the mock server for local development.
     pub coingecko_base_url: String,
+    pub coingecko_api_key: Option<String>,
     /// Coefficient for scaling all fees in percent.
     pub scale_fee_percent: u32,
     /// Coefficient for the fee price for fast withdrawal requests.
@@ -34,7 +35,7 @@ pub struct TickerConfig {
     pub available_liquidity_seconds: u64,
     /// List of the tokens that are unconditionally acceptable for paying fee in.
     pub unconditionally_valid_tokens: Vec<Address>,
-    ///
+    /// Token market update time
     pub token_market_update_time: u64,
     /// Number of tickers for load balancing.
     pub number_of_ticker_actors: u8,
@@ -51,13 +52,20 @@ impl TickerConfig {
         envy_load!("fee_ticker", "FEE_TICKER_")
     }
 
+    pub fn coingecko_api_key(&self) -> String {
+        self.coingecko_api_key.clone().unwrap_or_default()
+    }
+
     /// Returns the token price source type and the corresponding API URL.
-    pub fn price_source(&self) -> (TokenPriceSource, String) {
-        let url = match self.token_price_source {
-            TokenPriceSource::CoinGecko => self.coingecko_base_url.clone(),
-            TokenPriceSource::CoinMarketCap => self.coinmarketcap_base_url.clone(),
+    pub fn price_source(&self) -> (TokenPriceSource, String, Option<String>) {
+        let (url, key) = match self.token_price_source {
+            TokenPriceSource::CoinGecko => (
+                self.coingecko_base_url.clone(),
+                self.coingecko_api_key.clone(),
+            ),
+            TokenPriceSource::CoinMarketCap => (self.coinmarketcap_base_url.clone(), None),
         };
-        (self.token_price_source, url)
+        (self.token_price_source, url, key)
     }
 }
 
@@ -71,6 +79,7 @@ mod tests {
             token_price_source: TokenPriceSource::CoinGecko,
             coinmarketcap_base_url: "http://127.0.0.1:9876".into(),
             coingecko_base_url: "http://127.0.0.1:9876".into(),
+            coingecko_api_key: Some("".to_string()),
             scale_fee_percent: 100,
             fast_processing_coeff: 10.0f64,
             uniswap_url: "http://127.0.0.1:9975/graphql".to_string(),
@@ -89,6 +98,7 @@ mod tests {
 FEE_TICKER_TOKEN_PRICE_SOURCE="CoinGecko"
 FEE_TICKER_COINMARKETCAP_BASE_URL="http://127.0.0.1:9876"
 FEE_TICKER_COINGECKO_BASE_URL="http://127.0.0.1:9876"
+FEE_TICKER_COINGECKO_API_KEY=""
 FEE_TICKER_FAST_PROCESSING_COEFF="10"
 FEE_TICKER_UNISWAP_URL=http://127.0.0.1:9975/graphql
 FEE_TICKER_AVAILABLE_LIQUIDITY_SECONDS=1000
@@ -120,13 +130,21 @@ FEE_TICKER_SUBSIDY_CPK_PRICE_USD_SCALED=100
         config.token_price_source = TokenPriceSource::CoinGecko;
         assert_eq!(
             config.price_source(),
-            (TokenPriceSource::CoinGecko, COINGECKO_URL.into())
+            (
+                TokenPriceSource::CoinGecko,
+                COINGECKO_URL.into(),
+                Some("".to_string())
+            )
         );
 
         config.token_price_source = TokenPriceSource::CoinMarketCap;
         assert_eq!(
             config.price_source(),
-            (TokenPriceSource::CoinMarketCap, COINMARKETCAP_URL.into())
+            (
+                TokenPriceSource::CoinMarketCap,
+                COINMARKETCAP_URL.into(),
+                None
+            )
         );
     }
 }

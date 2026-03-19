@@ -63,13 +63,13 @@ impl OuterTypeBuilder {
         let mut result = BTreeMap::new();
 
         while let Some(front_element) = self.inner_members_queue.pop_front() {
-            if result.get(&front_element.member_type).is_some() {
+            if result.contains_key(&front_element.member_type) {
                 continue;
             }
 
             result.insert(front_element.member_type.clone(), front_element.clone());
             for inner_member in front_element.inner_members {
-                if inner_member.is_reference_type && result.get(&inner_member.member_type).is_none()
+                if inner_member.is_reference_type && !result.contains_key(&inner_member.member_type)
                 {
                     self.inner_members_queue.push_back(inner_member);
                 }

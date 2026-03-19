@@ -59,3 +59,9 @@ impl<'de> Deserialize<'de> for PackedPublicKey {
         Self::deserialize_packed(&bytes).map_err(Error::custom)
     }
 }
+
+impl Default for PackedPublicKey {
+    fn default() -> Self {
+        PackedPublicKey(PublicKey::<Engine>(edwards::Point::zero()))
+    }
+}

@@ -228,7 +228,7 @@ pub fn run_updaters(
         .connect_timeout(CONNECTION_TIMEOUT)
         .build()
         .expect("Failed to build reqwest::Client");
-    let (price_source, base_url) = config.price_source();
+    let (price_source, base_url, key) = config.price_source();
     let price_updater = match price_source {
         TokenPriceSource::CoinMarketCap => {
             let token_price_api =
@@ -239,10 +239,13 @@ pub fn run_updaters(
         }
 
         TokenPriceSource::CoinGecko => tokio::spawn(async move {
-            let token_price_api =
-                CoinGeckoAPI::new(client, base_url.parse().expect("Correct CoinGecko url"))
-                    .await
-                    .expect("failed to init CoinGecko client");
+            let token_price_api = CoinGeckoAPI::new(
+                client,
+                base_url.parse().expect("Correct CoinGecko url"),
+                key,
+            )
+            .await
+            .expect("failed to init CoinGecko client");
             let ticker_api = TickerApi::new(db_pool, token_price_api);
 
             ticker_api.keep_price_updated().await;

@@ -1,11 +1,11 @@
 // Built-in uses
+use crate::rollup_ops::RollupOpsBlock;
 use std::convert::TryFrom;
 // External uses
 // Workspace uses
 use zksync_types::operations::ZkSyncOp;
 // Local uses
 use super::default;
-use crate::{contract, rollup_ops::RollupOpsBlock};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ZkSyncContractVersion {
@@ -57,9 +57,9 @@ impl ZkSyncContractVersion {
     ) -> anyhow::Result<Vec<RollupOpsBlock>> {
         use ZkSyncContractVersion::*;
         let mut blocks = match self {
-            V0 | V1 | V2 | V3 => vec![contract::default::rollup_ops_blocks_from_bytes(data)?],
-            V4 | V5 => contract::v4::rollup_ops_blocks_from_bytes(data)?,
-            V6 => contract::v6::rollup_ops_blocks_from_bytes(data)?,
+            V0 | V1 | V2 | V3 => vec![default::rollup_ops_blocks_from_bytes(data)?],
+            V4 | V5 => super::v4::rollup_ops_blocks_from_bytes(data)?,
+            V6 => super::v6::rollup_ops_blocks_from_bytes(data)?,
         };
         // Set the contract version.
         for block in blocks.iter_mut() {
@@ -79,7 +79,7 @@ impl ZkSyncContractVersion {
         use ZkSyncContractVersion::*;
         match self {
             V0 | V1 | V2 | V3 | V4 | V5 => default::get_rollup_ops_from_data(data),
-            V6 => contract::v6::get_rollup_ops_from_data(data),
+            V6 => crate::contract::v6::get_rollup_ops_from_data(data),
         }
     }
 

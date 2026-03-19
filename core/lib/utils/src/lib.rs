@@ -11,6 +11,5 @@ mod string;
 pub use convert::*;
 pub use env_tools::*;
 pub use format::*;
-pub use macros::*;
 pub use serde_wrappers::*;
 pub use string::*;

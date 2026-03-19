@@ -29,8 +29,6 @@ pub mod primitives;
 pub mod proof;
 pub mod serialization;
 
-pub use crypto_exports::*;
-
 // Public re-export, so other crates don't have to specify it as their dependency.
 pub use fnv;
 

@@ -50,7 +50,7 @@ async fn transaction_state() {
         .unwrap()
         .as_u64();
     let deadline_block = eth_sender.get_deadline_block(current_block);
-    let operations = vec![
+    let operations = [
         test_data::commit_blocks_operation(0), // Will be committed.
         test_data::commit_blocks_operation(1), // Will be pending because of not enough confirmations.
         test_data::commit_blocks_operation(2), // Will be failed.
@@ -237,7 +237,7 @@ async fn operation_commitment_workflow() {
 
     // In this test we will run one commit blocks operation, one publish proof blocks onchain operation
     // and execute blocks operation and should obtain a notification about the operation being completed in the end.
-    let aggregated_operations = vec![
+    let aggregated_operations = [
         test_data::commit_blocks_operation(0),
         test_data::publish_proof_blocks_onchain_operations(0),
         test_data::execute_blocks_operations(0),

@@ -29,7 +29,7 @@ impl TxHandler<FullExit> for ZkSyncState {
             .map(BigUintSerdeWrapper);
 
         let op = if priority_op.token > params::max_fungible_token_id()
-            && self.nfts.get(&priority_op.token).is_some()
+            && self.nfts.contains_key(&priority_op.token)
         {
             let nft = self.nfts.get(&priority_op.token).unwrap();
             FullExitOp {

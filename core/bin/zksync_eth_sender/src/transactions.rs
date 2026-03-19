@@ -47,14 +47,9 @@ pub enum TxCheckOutcome {
 }
 
 /// Enumeration denoting if the operation was successfully committed, or not yet.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub enum OperationCommitment {
     Committed,
+    #[default]
     Pending,
-}
-
-impl Default for OperationCommitment {
-    fn default() -> Self {
-        Self::Pending
-    }
 }

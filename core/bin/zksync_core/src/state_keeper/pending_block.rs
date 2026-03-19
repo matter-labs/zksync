@@ -210,7 +210,7 @@ mod tests {
             op: None,
             fail_reason: Some("Mock".to_string()),
             block_index: None,
-            created_at: Utc.ymd(2021, 12, 9).and_hms(12, 26, 11),
+            created_at: Utc.with_ymd_and_hms(2021, 12, 9, 12, 26, 11).unwrap(),
             batch_id: None,
         }))
     }

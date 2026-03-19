@@ -75,6 +75,7 @@ pub use self::tokens::{
 pub use self::tx::{
     ForcedExit, MintNFT, Order, SignedZkSyncTx, Swap, Transfer, Withdraw, WithdrawNFT, ZkSyncTx,
 };
+use std::fmt::{Display, Formatter};
 
 pub use self::tx::eip712_signature;
 
@@ -113,9 +114,9 @@ impl Action {
     }
 }
 
-impl std::string::ToString for Action {
-    fn to_string(&self) -> String {
-        self.get_type().to_string()
+impl Display for Action {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.get_type())
     }
 }
 
@@ -138,12 +139,13 @@ pub enum ActionType {
     VERIFY,
 }
 
-impl std::string::ToString for ActionType {
-    fn to_string(&self) -> String {
-        match self {
-            ActionType::COMMIT => "COMMIT".to_owned(),
-            ActionType::VERIFY => "VERIFY".to_owned(),
-        }
+impl Display for ActionType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let res = match self {
+            ActionType::COMMIT => "COMMIT",
+            ActionType::VERIFY => "VERIFY",
+        };
+        write!(f, "{}", res)
     }
 }
 

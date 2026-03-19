@@ -529,7 +529,7 @@ mod tests {
         batch.push(zksync_op.clone());
         assert!(!GasCounter::batch_fits_into_empty_block(&batch));
 
-        let slice = &[zksync_op.clone()];
+        let slice = std::slice::from_ref(&zksync_op);
         for _ in 0..amount_ops_in_block.as_u64() {
             assert!(gas_counter.can_include(slice));
             gas_counter

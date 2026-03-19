@@ -53,7 +53,7 @@ impl ProverImpl for DummyProver {
                 let mut single_proof = self
                     .precomputed_proofs
                     .single_proofs
-                    .get(0)
+                    .first()
                     .expect("Failed to load correct single proof")
                     .0
                     .clone();

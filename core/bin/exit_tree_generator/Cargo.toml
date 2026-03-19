@@ -1,0 +1,33 @@
+[package]
+name = "zksync_exit_tree_generator"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+web3 = "0.18.0"
+anyhow = "1.0"
+structopt = "0.3.20"
+
+zksync_types = { path = "../../lib/types", version = "1.0" }
+zksync_contracts = { path = "../../lib/contracts", version = "1.0" }
+zksync_l1_event_listener = { path = "../../lib/l1_event_listener", version = "1.0" }
+zksync_config = { path = "../../lib/config", version = "1.0" }
+zksync_crypto = { path = "../../lib/crypto", version = "1.0" }
+zksync_storage = { path = "../../lib/storage", version = "1.0", optional = true }
+
+
+
+csv = "1.1.6"
+bigdecimal = "0.2.0"
+serde = "1.0"
+num-bigint = "0.3.3"
+serde_json = "1.0.69"
+rs_merkle = { version = "1.5", features = ["keccak256"] }
+ethabi = "16.0.0"
+hex = "0.4.3"
+rayon = "1.8.0"
+
+[features]
+default = []
+postgres = ["dep:zksync_storage"]

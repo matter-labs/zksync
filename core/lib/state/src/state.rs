@@ -1005,7 +1005,7 @@ mod tests {
 
         let mut initial_plasma_state = ZkSyncState::from_acc_map(AccountMap::default());
         assert_eq!(*initial_plasma_state.next_free_id, 0);
-        let updates = vec![
+        let updates = [
             (
                 AccountId(0),
                 AccountUpdate::Create {

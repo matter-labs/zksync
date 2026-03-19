@@ -1,0 +1,142 @@
+name: Deploy
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: zkSync Environment (mainnet, stage, rinkeby etc)
+        type: string
+        required: true
+      cluster:
+        description: Specifies Kubernets cluster
+        required: true
+        type: string
+      release-environment:
+        description: Helmfile release environment
+        required: true
+        type: string
+      release-namespace:
+        description: Helmfile/Helm release namespace (usually matches the environment)
+        type: string
+        required: true
+      image-tag:
+        description: Image tag (built image tag to deploy)
+        type: string
+        required: true
+      deployment-id:
+        description: Deployment for this pipeline
+        type: string
+        required: true
+      scaleup:
+        description: Force scaling the server deployment up to 1 replica
+        type: boolean
+        required: false
+      server-release:
+        description: Name of helm release for server
+        type: string
+        required: false
+        default: server
+      server-witness-release:
+        description: Name of helm release for prover
+        type: string
+        required: false
+        default: server-witness
+      prover-release:
+        description: Name of helm release for prover
+        type: string
+        required: false
+        default: prover
+
+    secrets:
+      github-token:
+        description: GitHub token
+        required: false
+
+defaults:
+  run:
+    shell: bash -leo pipefail {0}
+
+# Disable simultaneous deployments into a single environment
+concurrency: deploy-app-${{ inputs.environment }}
+
+jobs:
+  login-to-gcr:
+    runs-on: ["matterlabs-deployer-testnet"]
+    name: "Login to GCR"
+    outputs:
+      docker_token: ${{ steps.auth.outputs.docker_token }}
+    steps:
+      - id: "auth"
+        run: |
+          echo "docker_token=$(gcloud auth print-access-token)" >> $GITHUB_OUTPUT
+  deploy:
+    name: Server
+    runs-on: ["matterlabs-deployer-${{ inputs.cluster }}"]
+    needs: login-to-gcr
+    container:
+      image: gcr.io/matterlabs-infra/docker-k8s-linter:latest
+      credentials:
+        username: oauth2accesstoken
+        password: ${{ needs.login-to-gcr.outputs.docker_token }}
+      volumes:
+        - /var/run/secrets/tokens:/var/run/secrets/tokens
+    env:
+      DEPLOY_APPS: -l name=${{ inputs.server-release }} -l name=${{ inputs.prover-release }}
+      DEPLOY_APPS_PROD: -l name=${{ inputs.server-release }} -l name=${{ inputs.prover-release }} -l name=${{ inputs.server-witness-release }}
+      IMAGE_TAG: ${{ inputs.image-tag }}
+      KUBE_CONTEXT: matterlabs-zksync-${{ inputs.cluster }}
+      KUBE_TOKENPATH: /var/run/secrets/tokens/matterlabs-deployer-${{ inputs.cluster }}
+    steps:
+      -
+        name: Install additional deps
+        run: |
+          helm plugin install https://github.com/databus23/helm-diff
+          helm plugin install https://github.com/jkroepke/helm-secrets --version v3.12.0
+          curl -LO https://github.com/getsops/sops/releases/download/v3.8.1/sops-v3.8.1.linux.amd64
+          mv sops-v3.8.1.linux.amd64 /usr/local/bin/sops
+          chmod +x /usr/local/bin/sops
+          curl -LO https://github.com/helmfile/helmfile/releases/download/v0.147.0/helmfile_0.147.0_linux_amd64.tar.gz
+          tar xzvf helmfile_0.147.0_linux_amd64.tar.gz
+          mv helmfile /usr/local/bin/helmfile
+          chmod +x /usr/local/bin/helmfile
+
+      -
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
+        with:
+          repository: matter-labs/gh-workflows
+          token: ${{ secrets.github-token }}
+      -
+        name: Generate ~/.kube/config
+        run: scripts/kubeconfig-projected-token
+      -
+        name: Clone helm-infra
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3
+        with:
+          repository: matter-labs/helm-infra
+          path: helm-infra
+          token: ${{ secrets.github-token }}
+      -
+        if: "${{ inputs.environment != 'mainnet' }}"
+        name: Deploy Zksync
+        working-directory: helm-infra
+        run: |
+          UPDATE_REPOS=y helmfile -e ${{ inputs.release-environment }} repos
+          helmfile -e ${{ inputs.release-environment }} $DEPLOY_APPS apply --args "--timeout 900s"
+      -
+        if: "${{ inputs.environment == 'mainnet' }}"
+        name: Deploy Zksync Prod
+        working-directory: helm-infra
+        run: |
+          UPDATE_REPOS=y helmfile -e ${{ inputs.release-environment }} repos
+          helmfile -e ${{ inputs.release-environment }} $DEPLOY_APPS_PROD apply --args "--timeout 900s"
+      -
+        name: Scale Up
+        if: inputs.scaleup
+        run: kubectl scale deployment -n ${{ inputs.release-namespace }} server --replicas=1
+      -
+        if: always()
+        name: Update deployment status
+        uses: chrnorm/deployment-status@releases/v1
+        with:
+          token: ${{ github.token }}
+          state: ${{ (job.status != 'cancelled') && job.status || 'inactive' }}
+          deployment_id: ${{ inputs.deployment-id }}
