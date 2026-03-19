@@ -246,6 +246,12 @@ impl Withdraw {
     /// Note that we don't need to check whether token amount is packable, because pubdata for this operation
     /// contains unpacked value only.
     pub fn check_correctness(&mut self) -> Result<(), TransactionError> {
+        // Canonicalize missing time_range to the default so that get_bytes()
+        // always includes timestamp bytes, matching the circuit's V1 preimage
+        // reconstruction.
+        if self.time_range.is_none() {
+            self.time_range = Some(TimeRange::default());
+        }
         if self.amount > BigUint::from(u128::MAX) {
             return Err(TransactionError::WrongAmount);
         }
