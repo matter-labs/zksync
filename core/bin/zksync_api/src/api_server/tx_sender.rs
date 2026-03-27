@@ -178,7 +178,7 @@ impl TxSender {
         }
     }
 
-    /// If `ForcedExit` has Ethereum siganture (e.g. it's a part of a batch), an actual signer
+    /// If `ForcedExit` has Ethereum signature (e.g. it's a part of a batch), an actual signer
     /// is initiator, not the target, thus, this function will perform a database query to acquire
     /// the corresponding address.
     async fn get_tx_sender(&self, tx: &ZkSyncTx) -> Result<Address, anyhow::Error> {

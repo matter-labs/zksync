@@ -777,7 +777,7 @@ impl ZkSyncStateKeeper {
         // TODO (ZKS-821): Currently the logic of this procedure is obscure and error-prone.
         // I've met multiple bugs trying to adapt it because it works at the same time with the "old"
         // pending block and "new" pending block. Actions "create block to be sealed" and "update pending block"
-        // should be spearated.
+        // should be separated.
         let current_block = self.pending_block.number;
         let next_unprocessed_priority_op = self.pending_block.unprocessed_priority_op_current;
         let new_pending_block = PendingBlock::new(

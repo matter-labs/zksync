@@ -10,7 +10,7 @@ use zksync_circuit::witness::transfer::TransferWitness;
 
 type TransferWitnessBn256 = TransferWitness<Bn256>;
 
-/// Measures the time of trasfer apply tx
+/// Measures the time of transfer apply tx
 fn transfer_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
     let accounts = generate_accounts(*number_of_accounts);
     let account_from = &accounts[0];
