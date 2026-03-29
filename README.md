@@ -25,7 +25,7 @@ This architecture provides the following guarantees:
 - Thanks to validity proofs, neither users nor a single other trusted party needs to be online to monitor Rollup blocks
   in order to prevent fraud.
 
-In other words, ZK Rollup strictly inherits the security guarantees of the underlying L1.
+In other words, ZK Rollup strictly inherits the security guarantees of the underlying L1.  L2.
 
 To learn how to use zkSync, please refer to the [zkSync SDK documentation](https://zksync.io/api/sdk/).
 
