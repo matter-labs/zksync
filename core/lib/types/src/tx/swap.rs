@@ -233,7 +233,7 @@ impl Swap {
     }
 
     /// Creates a signed transaction using private key and
-    /// checks for the transaction correcteness.
+    /// checks for the transaction correctness.
     #[allow(clippy::too_many_arguments)]
     pub fn new_signed(
         submitter_id: AccountId,

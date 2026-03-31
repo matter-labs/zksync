@@ -371,7 +371,7 @@ mod test {
             0
         );
 
-        // The tranasction is correct, buuut it is expired
+        // The transaction is correct, but it is expired
         forced_exit_sender
             .process_request(
                 BigUint::from_str("10000000001").unwrap(),

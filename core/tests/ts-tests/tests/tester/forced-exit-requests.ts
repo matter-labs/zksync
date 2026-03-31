@@ -86,7 +86,7 @@ Tester.prototype.testForcedExitRequestMultipleTokens = async function (
         value: amountToPay,
         gasPrice,
         to: contractAddress,
-        // Even though the standart payment gasLimit is 21k, the gasLimit needed for
+        // Even though the standard payment gasLimit is 21k, the gasLimit needed for
         // smart contract calls (even simply sending ether) is roughly 32k
         // This the restriction that all the ERC-1271 wallets face, so we consider
         // safe to assume that the gas limit is at least 32k

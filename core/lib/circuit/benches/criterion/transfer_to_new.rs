@@ -11,7 +11,7 @@ use zksync_circuit::witness::transfer_to_new::TransferToNewWitness;
 
 type TransferToNewWitnessBn256 = TransferToNewWitness<Bn256>;
 
-/// Measures the time of trasfer to new apply tx
+/// Measures the time of transfer to new apply tx
 fn transfer_to_new_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
     let accounts = generate_accounts(*number_of_accounts);
     let account_from = &accounts[0];
@@ -41,7 +41,7 @@ fn transfer_to_new_apply_tx(b: &mut Bencher<'_>, number_of_accounts: &usize) {
     });
 }
 
-/// Measures the time of trasfer to new get pubdata
+/// Measures the time of transfer to new get pubdata
 fn transfer_to_new_get_pubdata(b: &mut Bencher<'_>) {
     let accounts = generate_accounts(10);
     let account_from = &accounts[0];
@@ -71,7 +71,7 @@ fn transfer_to_new_get_pubdata(b: &mut Bencher<'_>) {
     });
 }
 
-/// Measures the time of trasfer to new calculate operations
+/// Measures the time of transfer to new calculate operations
 fn transfer_to_new_calculate_operations(b: &mut Bencher<'_>) {
     let accounts = generate_accounts(10);
     let account_from = &accounts[0];

@@ -178,7 +178,7 @@ impl AccountLifespan {
         };
     }
 
-    /// Generic sumbitter for zkSync network: it can operate both individual transactions and
+    /// Generic submitter for zkSync network: it can operate both individual transactions and
     /// batches, as long as we can provide a `SyncTransactionHandle` to wait for the commitment and the
     /// execution result.
     /// Once result is obtained, it's compared to the expected operation outcome in order to check whether

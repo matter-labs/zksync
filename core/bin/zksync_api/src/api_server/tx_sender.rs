@@ -323,7 +323,7 @@ impl TxSender {
         }
         if let EthAccountType::No2FA(Some(unchecked_hash)) = signer_type {
             let order_pub_key_hash = PubKeyHash::from_pubkey(&order.signature.pub_key.0);
-            // We don't scheck the signature only if the order was signed with the same
+            // We don't check the signature only if the order was signed with the same
             // is the same as unchecked PubKey
             if order_pub_key_hash == unchecked_hash {
                 return Ok(());

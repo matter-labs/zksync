@@ -214,7 +214,7 @@ fn test_swap_success() {
             is_limit_order: (false, false),
             test_accounts: vec![],
         },
-        // Trasnfer, but using a swap
+        // Transfer, but using a swap
         TestSwap {
             accounts: (1, 3),
             recipients: (2, 4),

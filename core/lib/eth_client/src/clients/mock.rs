@@ -87,7 +87,7 @@ impl MockEthereum {
         self.inner.tx_statuses.write().await.insert(tx_hash, status);
     }
 
-    /// Same as `add_successfull_execution`, but marks the transaction as a failure.
+    /// Same as `add_successful_execution`, but marks the transaction as a failure.
     pub async fn add_failed_execution(&mut self, hash: &H256, confirmations: u64) {
         Arc::get_mut(&mut self.inner).unwrap().block_number += confirmations;
 

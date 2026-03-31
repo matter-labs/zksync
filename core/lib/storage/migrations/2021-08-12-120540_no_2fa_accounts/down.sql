@@ -1,4 +1,4 @@
--- Unfortunatley there is no easy way to remove a type from enum, so we'll have to just 
+-- Unfortunately there is no easy way to remove a type from enum, so we'll have to just
 -- drop the old one and cast the types
 
 ALTER TYPE eth_account_type ADD VALUE 'No2FA';
