@@ -20,8 +20,8 @@ block is published over the mainchain network in the cheap calldata.
 This architecture provides the following guarantees:
 
 - The Rollup validator(s) can never corrupt the state or steal funds (unlike Sidechains).
-- Users can always retrieve the funds from the Rollup even if validator(s) stop cooperating because the data is
-  available (unlike Plasma).
+- Users maintain the ability to reclaim their funds from the Rollup, even in cases where validators cease cooperation,
+  as all necessary data remains accessible—a feature not shared by Plasma.
 - Thanks to validity proofs, neither users nor a single other trusted party needs to be online to monitor Rollup blocks
   in order to prevent fraud.
 
