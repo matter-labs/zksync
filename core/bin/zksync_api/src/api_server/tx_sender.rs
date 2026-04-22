@@ -81,10 +81,15 @@ pub struct TxSender {
     pub max_subsidy_usd: Ratio<BigUint>,
     pub subsidized_ips: HashSet<String>,
     pub chain_id: ChainId,
+
+    /// When true, all L2 tx submissions (single and batch) are rejected.
+    pub l2_transactions_disabled: bool,
 }
 
 #[derive(Debug, Error)]
 pub enum SubmitError {
+    #[error("L2 transactions are disabled.")]
+    L2TransactionsDisabled,
     #[error("Account close tx is disabled.")]
     AccountCloseDisabled,
     #[error("Invalid params: {0}.")]
@@ -175,6 +180,7 @@ impl TxSender {
             max_subsidy_usd: config.max_subsidy_usd(),
             subsidized_ips: config.subsidized_ips.clone().into_iter().collect(),
             chain_id,
+            l2_transactions_disabled: config.l2_transactions_disabled,
         }
     }
 
@@ -490,6 +496,10 @@ impl TxSender {
         signature: TxEthSignatureVariant,
         extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<TxHash, SubmitError> {
+        if self.l2_transactions_disabled {
+            return Err(SubmitError::L2TransactionsDisabled);
+        }
+
         let labels = vec![
             ("stage", "api".to_string()),
             ("name", tx.variance_name()),
@@ -642,6 +652,10 @@ impl TxSender {
         eth_signatures: Option<EthBatchSignatures>,
         extracted_request_metadata: Option<RequestMetadata>,
     ) -> Result<SubmitBatchResponse, SubmitError> {
+        if self.l2_transactions_disabled {
+            return Err(SubmitError::L2TransactionsDisabled);
+        }
+
         // Bring the received signatures into a vector for simplified work.
         let eth_signatures = EthBatchSignatures::api_arg_to_vec(eth_signatures);
 

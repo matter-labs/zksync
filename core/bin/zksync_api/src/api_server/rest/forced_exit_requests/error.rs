@@ -82,6 +82,7 @@ impl ResponseError for ApiError {
 
 #[derive(Debug, Clone, Copy)]
 pub enum SumbitErrorCode {
+    L2TransactionsDisabled = 100,
     AccountCloseDisabled = 101,
     InvalidParams = 102,
     UnsupportedFastProcessing = 103,
@@ -97,6 +98,7 @@ pub enum SumbitErrorCode {
 impl SumbitErrorCode {
     fn from_err(err: &SubmitError) -> Self {
         match err {
+            SubmitError::L2TransactionsDisabled => Self::L2TransactionsDisabled,
             SubmitError::AccountCloseDisabled => Self::AccountCloseDisabled,
             SubmitError::InvalidParams(_) => Self::InvalidParams,
             SubmitError::UnsupportedFastProcessing => Self::UnsupportedFastProcessing,

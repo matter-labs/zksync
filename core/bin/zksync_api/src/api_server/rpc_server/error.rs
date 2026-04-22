@@ -22,6 +22,7 @@ pub enum RpcErrorCodes {
     OperationsLimitReached = 302,
     UnsupportedFastProcessing = 303,
     Toggle2FA = 304,
+    L2TransactionsDisabled = 305,
 }
 
 impl From<TxAddError> for RpcErrorCodes {
@@ -54,6 +55,11 @@ impl From<RpcErrorCodes> for ErrorCode {
 impl From<SubmitError> for jsonrpc_core::Error {
     fn from(inner: SubmitError) -> Self {
         match inner {
+            SubmitError::L2TransactionsDisabled => Self {
+                code: RpcErrorCodes::L2TransactionsDisabled.into(),
+                message: "L2 transactions are disabled.".to_string(),
+                data: None,
+            },
             SubmitError::AccountCloseDisabled => Self {
                 code: RpcErrorCodes::AccountCloseDisabled.into(),
                 message: "Account close tx is disabled.".to_string(),

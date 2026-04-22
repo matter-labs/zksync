@@ -39,6 +39,7 @@ pub enum ErrorCode {
     InappropriateFeeToken = 606,
     CommunicationCoreServer = 607,
     Toggle2FAError = 608,
+    L2TransactionsDisabled = 609,
     Other = 60_000,
 }
 
@@ -191,6 +192,7 @@ impl ApiError for SubmitError {
 
     fn code(&self) -> ErrorCode {
         match self {
+            Self::L2TransactionsDisabled => ErrorCode::L2TransactionsDisabled,
             Self::AccountCloseDisabled => ErrorCode::AccountCloseDisabled,
             Self::InvalidParams(_) => ErrorCode::InvalidParams,
             Self::UnsupportedFastProcessing => ErrorCode::UnsupportedFastProcessing,
