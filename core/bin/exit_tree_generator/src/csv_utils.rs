@@ -30,7 +30,7 @@ pub(crate) fn load_balances(path: &str) -> anyhow::Result<HashMap<u32, Vec<Stora
             .or_insert(vec![])
             .push(balance);
     }
-    println!(
+    eprintln!(
         "Loaded balances for {} accounts from {}",
         balances.len(),
         path
@@ -55,7 +55,7 @@ pub fn load_tokens(path: &str) -> anyhow::Result<HashMap<u64, Address>> {
         let token: StorageToken = line?;
         tokens.insert(token.id as u64, token.address);
     }
-    println!("Loaded {} tokens from {}", tokens.len(), path);
+    eprintln!("Loaded {} tokens from {}", tokens.len(), path);
     Ok(tokens)
 }
 
@@ -75,27 +75,26 @@ pub(crate) fn load_accounts(path: &str) -> anyhow::Result<HashMap<u32, StorageAc
         let account: StorageAccount = line?;
         accounts.insert(account.id, account);
     }
-    println!("Loaded {} accounts from {}", accounts.len(), path);
+    eprintln!("Loaded {} accounts from {}", accounts.len(), path);
     Ok(accounts)
 }
 
-/// Loads Merkle tree leaves from a CSV file.
+/// Loads Merkle tree leaves from a CSV file and sorts them by the canonical claim index.
 ///
 /// # Arguments
 /// * `path` - Path to the CSV file containing the leaves
 ///
 /// # Returns
-/// Leaves mapped by (token_address, account_address)
-pub fn load_keccak_merkle_leaves(
-    path: &str,
-) -> anyhow::Result<HashMap<(Address, Address), MerkleTreeLeaf>> {
-    let mut leaves = HashMap::new();
+/// Leaves ordered by claim index.
+pub fn load_keccak_merkle_leaves(path: &str) -> anyhow::Result<Vec<MerkleTreeLeaf>> {
+    let mut leaves = Vec::new();
     for line in csv_reader(path)
         .with_context(|| format!("Unable to open file at {path}"))?
         .deserialize()
     {
         let leaf: MerkleTreeLeaf = line?;
-        leaves.insert((leaf.token_address, leaf.account_address), leaf);
+        leaves.push(leaf);
     }
+    leaves.sort_by_key(|leaf| leaf.claim_index);
     Ok(leaves)
 }

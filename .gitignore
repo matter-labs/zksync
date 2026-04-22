@@ -50,3 +50,6 @@ core/lib/storage/.env
 perf.data*
 flamegraph.svg
 restored_data
+
+
+core/bin/exit_tree_generator/data
