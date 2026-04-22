@@ -85,7 +85,7 @@ fn main() -> anyhow::Result<()> {
             tokens,
             output,
         } => {
-            keccak_merkle_tree::run_create_keccak_leaves(accounts, balances, tokens, output)?;
+            keccak_merkle_tree::run_create_keccak_leaves(&accounts, &balances, &tokens, output)?;
         }
         #[cfg(feature = "postgres")]
         Opt::RestoreTreeFromDb => {

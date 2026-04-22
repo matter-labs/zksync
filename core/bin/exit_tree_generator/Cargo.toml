@@ -22,12 +22,16 @@ csv = "1.1.6"
 bigdecimal = "0.2.0"
 serde = "1.0"
 num-bigint = "0.3.3"
-serde_json = "1.0.69"
+serde_json = "1.0.145"
 rs_merkle = { version = "1.5", features = ["keccak256"] }
 ethabi = "16.0.0"
 hex = "0.4.3"
-rayon = "1.8.0"
+rayon = "1.10"
 
 [features]
 default = []
 postgres = ["dep:zksync_storage"]
+
+[dev-dependencies]
+alloy = { version = "1", features = ["full", "node-bindings"] }
+dotenvy = "0.15"

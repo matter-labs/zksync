@@ -8,7 +8,7 @@ use web3::types::Address;
 /// Account data structure loaded from CSV storage.
 /// Represents a zkSync account with its basic information.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct StorageAccount {
+pub struct StorageAccount {
     /// Unique account identifier
     pub id: u32,
     /// Account nonce (number of transactions)
@@ -22,7 +22,7 @@ pub(crate) struct StorageAccount {
 /// Balance data structure loaded from CSV storage.
 /// Represents a token balance for a specific account.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct StorageBalance {
+pub struct StorageBalance {
     /// Account ID that owns this balance
     pub account_id: u32,
     /// Token/coin ID for this balance
@@ -34,7 +34,7 @@ pub(crate) struct StorageBalance {
 /// Token data structure loaded from CSV storage.
 /// Maps token IDs to their Ethereum addresses.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct StorageToken {
+pub struct StorageToken {
     /// Unique token identifier
     pub id: u32,
     /// Ethereum address of the token contract
@@ -45,6 +45,8 @@ pub(crate) struct StorageToken {
 /// Used for generating Merkle proofs in exit scenarios.
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct MerkleTreeLeaf {
+    /// Canonical leaf index used in the contract-side packed leaf hash.
+    pub claim_index: u64,
     /// Ethereum address of the account
     pub account_address: Address,
     /// Ethereum address of the token
@@ -53,25 +55,17 @@ pub struct MerkleTreeLeaf {
     pub balance: String,
 }
 
-/// Converts a MerkleTreeLeaf into a byte vector using ABI encoding.
-/// The encoding format is: [Address(account), Address(token), Uint(balance)]
-///
-/// # Panics
-/// Panics if balance string cannot be parsed as a decimal number
-impl From<MerkleTreeLeaf> for Vec<u8> {
-    fn from(val: MerkleTreeLeaf) -> Self {
-        ethabi::encode(&[
-            ethabi::Token::Address(val.account_address),
-            ethabi::Token::Address(val.token_address),
-            ethabi::Token::Uint(U256::from_big_endian(
-                BigDecimal::from_str(&val.balance)
-                    .unwrap()
-                    .to_bigint()
-                    .unwrap()
-                    .to_bytes_be()
-                    .1
-                    .as_slice(),
-            )),
-        ])
+impl MerkleTreeLeaf {
+    /// Parses the decimal balance string into the uint256 value used by the contracts.
+    pub fn balance_as_u256(&self) -> U256 {
+        U256::from_big_endian(
+            BigDecimal::from_str(&self.balance)
+                .unwrap()
+                .to_bigint()
+                .unwrap()
+                .to_bytes_be()
+                .1
+                .as_slice(),
+        )
     }
 }

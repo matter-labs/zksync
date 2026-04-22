@@ -33,7 +33,7 @@ jobs:
       - name: start-services
         run: |
           docker-compose -f docker-compose-runner.yml down
-          docker-compose -f docker-compose-runner.yml up --build -d zk
+          docker-compose -f docker-compose-runner.yml up -d zk
           ci_run sccache --start-server
 
       - name: setup-env
@@ -72,7 +72,7 @@ jobs:
         run: |
           docker-compose -f docker-compose-runner.yml down
           docker-compose -f docker-compose-runner.yml pull postgres geth dev-ticker dev-liquidity-token-watcher || true
-          docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
+          docker-compose -f docker-compose-runner.yml up -d geth postgres zk
           ci_run sccache --start-server
 
       - name: init
@@ -133,7 +133,7 @@ jobs:
         run: |
           docker-compose -f docker-compose-runner.yml down
           docker-compose -f docker-compose-runner.yml pull postgres geth dev-ticker dev-liquidity-token-watcher || true
-          docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
+          docker-compose -f docker-compose-runner.yml up -d geth postgres zk
           ci_run sccache --start-server
 
       - name: init
@@ -201,7 +201,7 @@ jobs:
         run: |
           docker-compose -f docker-compose-runner.yml down
           docker-compose -f docker-compose-runner.yml pull postgres geth dev-ticker dev-liquidity-token-watcher || true
-          docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
+          docker-compose -f docker-compose-runner.yml up -d geth postgres zk
           ci_run sccache --start-server
 
       - name: init
@@ -236,7 +236,7 @@ jobs:
         run: |
           docker-compose -f docker-compose-runner.yml down
           docker-compose -f docker-compose-runner.yml pull postgres geth dev-ticker dev-liquidity-token-watcher || true
-          docker-compose -f docker-compose-runner.yml up --build -d zk
+          docker-compose -f docker-compose-runner.yml up -d zk
           ci_run sccache --start-server
 
       - name: init
@@ -273,7 +273,7 @@ jobs:
         run: |
           docker-compose -f docker-compose-runner.yml down
           docker-compose -f docker-compose-runner.yml pull postgres geth dev-ticker dev-liquidity-token-watcher || true
-          docker-compose -f docker-compose-runner.yml up --build -d geth postgres zk
+          docker-compose -f docker-compose-runner.yml up -d geth postgres zk
           ci_run sccache --start-server
 
       - name: init
