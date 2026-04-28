@@ -14,6 +14,14 @@ contract ZkSyncWithdrawalUnitTest is ZkSync {
         pendingBalances[packAddressAndTokenId(_owner, _token)].balanceToWithdraw = _amount;
     }
 
+    function setAdditionalZkSync(AdditionalZkSync _additionalZkSync) external {
+        additionalZkSync = _additionalZkSync;
+    }
+
+    function setSecurityCouncilMultisig(address _multisig) external {
+        securityCouncilMultisig = _multisig;
+    }
+
     // solhint-disable-next-line no-empty-blocks
     function receiveETH() external payable {}
 }

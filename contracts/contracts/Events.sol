@@ -75,6 +75,17 @@ interface Events {
 
     /// @notice Notice period changed
     event NoticePeriodChange(uint256 newNoticePeriod);
+
+    /// @notice Deposits are paused
+    event DepositsPause();
+    /// @notice L1 claim distributor configured for zkSync Lite sunset claims.
+    event L1ClaimDistributorSet(address indexed claimDistributor);
+
+    /// @notice Claim root configured for L1 sunset claims.
+    event ClaimRootSet(bytes32 claimRoot);
+
+    /// @notice Aggregate token migration executed and L1 claim contract funded.
+    event TokenMigrationExecuted(address indexed token);
 }
 
 /// @title Upgrade events

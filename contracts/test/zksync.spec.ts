@@ -444,7 +444,8 @@ describe('zkSync withdraw unit tests', function () {
                 gasLimit: 300000
             });
             const receipt = await tx.wait();
-            gasFee = receipt.gasUsed.mul(await ethWallet.provider.getGasPrice());
+            const gasPrice = receipt.effectiveGasPrice || tx.gasPrice || (await ethWallet.provider.getGasPrice());
+            gasFee = receipt.gasUsed.mul(gasPrice);
         } else {
             await zksyncContract.withdrawPendingBalance(ethWallet.address, token, amount, { gasLimit: 300000 });
         }

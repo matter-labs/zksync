@@ -133,7 +133,7 @@ sudo apt install build-essential
 Also, we need `[sqlx](https://github.com/launchbadge/sqlx)` CLI (it is used to generate database wrappers):
 
 ```bash
-cargo install --version=0.5.6 sqlx-cli
+cargo install --locked --version=0.8.6 sqlx-cli --no-default-features --features postgres
 ```
 
 If you face an error `Could not find directory of OpenSSL installation`, then you should do the following.

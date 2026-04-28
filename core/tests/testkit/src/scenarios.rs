@@ -116,6 +116,7 @@ pub async fn perform_basic_tests() {
         .map(|block| block.block_transactions.len())
         .sum();
     let mut operations_num: usize = 0;
+    #[allow(deprecated)]
     while let Ok(Some(message)) = test_setup.processed_tx_events_receiver.try_next() {
         operations_num += message.executed_ops.len();
     }

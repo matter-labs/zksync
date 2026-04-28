@@ -3,16 +3,15 @@ use std::collections::HashMap;
 
 use anyhow::{bail, ensure, format_err};
 use ethabi::{Contract, Token, Uint};
-use num::{BigUint, ToPrimitive};
+use num::BigUint;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use web3::{
     contract::Options,
     transports::Http,
-    types::{TransactionReceipt, H256, U128, U256, U64},
+    types::{TransactionReceipt, H256, U256, U64},
 };
 use zksync_contracts::{erc20_contract, zksync_contract};
-use zksync_crypto::proof::EncodedSingleProof;
 use zksync_eth_client::ETHDirectClient;
 use zksync_eth_signer::PrivateKeySigner;
 use zksync_types::aggregated_operations::{
@@ -142,70 +141,6 @@ impl EthereumAccount {
             receipt.clone(),
             priority_op_from_tx_logs(&receipt).expect("no priority op log in full exit"),
         ))
-    }
-
-    pub async fn exit(
-        &self,
-        last_block: &Block,
-        account_id: AccountId,
-        token_id: TokenId,
-        amount: &BigUint,
-        zero_account_address: Address,
-        proof: EncodedSingleProof,
-    ) -> Result<ETHExecResult, anyhow::Error> {
-        let options = Options {
-            gas: Some(3_000_000.into()),
-            // `exit` function requires more gas to operate.
-            ..Default::default()
-        };
-
-        let stored_block_info = stored_block_info(last_block);
-        let data = self.main_contract_eth_client.encode_tx_data(
-            "performExodus",
-            (
-                stored_block_info,
-                self.address,
-                u64::from(*account_id),
-                u64::from(*token_id),
-                U128::from(amount.to_u128().unwrap()),
-                0u64,
-                zero_account_address,
-                0u64,
-                H256::default(),
-                proof.proof,
-            ),
-        );
-        let signed_tx = self
-            .main_contract_eth_client
-            .sign_prepared_tx(data, options)
-            .await
-            .map_err(|e| format_err!("Exit send err: {}", e))?;
-
-        let receipt =
-            send_raw_tx_wait_confirmation(&self.main_contract_eth_client, signed_tx.raw_tx).await?;
-
-        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client).await)
-    }
-
-    pub async fn cancel_outstanding_deposits_for_exodus_mode(
-        &self,
-        number: u64,
-        priority_op_data: Vec<Vec<u8>>,
-    ) -> Result<ETHExecResult, anyhow::Error> {
-        let data = self.main_contract_eth_client.encode_tx_data(
-            "cancelOutstandingDepositsForExodusMode",
-            (number, priority_op_data),
-        );
-        let signed_tx = self
-            .main_contract_eth_client
-            .sign_prepared_tx(data, default_tx_options())
-            .await
-            .map_err(|e| format_err!("cancelOutstandingDepositsForExodusMode send err: {}", e))?;
-
-        let receipt =
-            send_raw_tx_wait_confirmation(&self.main_contract_eth_client, signed_tx.raw_tx).await?;
-
-        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client).await)
     }
 
     pub async fn change_pubkey_priority_op(
@@ -512,21 +447,6 @@ impl EthereumAccount {
         Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client).await)
     }
 
-    pub async fn trigger_exodus_if_needed(&self) -> Result<ETHExecResult, anyhow::Error> {
-        let data = self
-            .main_contract_eth_client
-            .encode_tx_data("activateExodusMode", ());
-        let signed_tx = self
-            .main_contract_eth_client
-            .sign_prepared_tx(data, default_tx_options())
-            .await
-            .map_err(|e| format_err!("Trigger exodus if needed send err: {}", e))?;
-        let receipt =
-            send_raw_tx_wait_confirmation(&self.main_contract_eth_client, signed_tx.raw_tx).await?;
-
-        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client).await)
-    }
-
     pub async fn eth_block_number(&self) -> Result<u64, anyhow::Error> {
         Ok(self.main_contract_eth_client.block_number().await?.as_u64())
     }
@@ -606,7 +526,10 @@ impl ETHExecResult {
                 self.receipt.transaction_hash
             );
         } else if self.revert_reason != code {
-            panic!("Transaction failed with incorrect return code, expected: {}, found: {}, tx: 0x{:x}", code, self.revert_reason, self.receipt.transaction_hash);
+            panic!(
+                "Transaction failed with incorrect return code, expected: {}, found: {}, tx: 0x{:x}",
+                code, self.revert_reason, self.receipt.transaction_hash
+            );
         }
     }
 }
