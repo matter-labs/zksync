@@ -154,13 +154,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     }
 
     /// @notice zkSync contract upgrade. Can be external because Proxy contract intercepts illegal calls of this function.
-    /// @param upgradeParameters Encoded representation of upgrade parameters
-    // solhint-disable-next-line no-empty-blocks
+    /// @param upgradeParameters Encoded representation of upgrade parameters (unused — parameters are baked in at compile time)
     function upgrade(bytes calldata upgradeParameters) external nonReentrant {
         // Silencing the warning "Unused function parameter"
         upgradeParameters;
         approvedUpgradeNoticePeriod = UPGRADE_NOTICE_PERIOD;
         additionalZkSync = AdditionalZkSync($(NEW_ADDITIONAL_ZKSYNC_ADDRESS));
+        securityCouncilMultisig = $(SECURITY_COUNCIL_MULTISIG_ADDRESS);
     }
 
     function cutUpgradeNoticePeriod(bytes32 targetsHash) external {
@@ -174,6 +174,35 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         // All functions delegated to additional contract should NOT be nonReentrant
         // Silencing the warning "Unused function parameter"
         signatures;
+        delegateAdditional();
+    }
+
+    function setClaimRoot(address _claimDistributor) external nonReentrant {
+        require(msg.sender == securityCouncilMultisig, "tm4");
+        require(_claimDistributor != address(0), "tm1");
+
+        bytes32 _claimRoot = IL1ClaimDistributor(_claimDistributor).MERKLE_ROOT();
+        require(_claimRoot != bytes32(0), "tm2");
+
+        l1ClaimDistributor = _claimDistributor;
+        claimRoot = _claimRoot;
+
+        emit L1ClaimDistributorSet(_claimDistributor);
+        emit ClaimRootSet(_claimRoot);
+
+        if (!exodusMode) {
+            exodusMode = true;
+            emit ExodusMode();
+        }
+    }
+
+    function isTokenMigrated(address token) external view returns (bool) {
+        return migratedTokensByAddress[token];
+    }
+
+    function migrateToken(address token) external {
+        // All functions delegated to additional contract should NOT be nonReentrant
+        token;
         delegateAdditional();
     }
 
@@ -203,24 +232,13 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         return uint128(balanceDiff);
     }
 
-    /// @notice Accrues users balances from deposit priority requests in Exodus mode
-    /// @dev WARNING: Only for Exodus mode
-    /// @dev Canceling may take several separate transactions to be completed
-    /// @param _n number of requests to process
-    function cancelOutstandingDepositsForExodusMode(uint64 _n, bytes[] calldata _depositsPubdata) external {
-        // All functions delegated to additional contract should NOT be nonReentrant
-        // Silencing the warning "Unused function parameter"
-        _n;
-        _depositsPubdata;
-        delegateAdditional();
-    }
-
     /// @notice Deposit ETH to Layer 2 - transfer ether from user into contract, validate it, register deposit
     /// @param _zkSyncAddress The receiver Layer 2 address
     function depositETH(address _zkSyncAddress) external payable {
         require(_zkSyncAddress != SPECIAL_ACCOUNT_ADDRESS, "P");
         require(msg.value > 0, "M"); // Zero-value deposits are forbidden by zkSync rollup logic
         requireActive();
+        requireActiveDeposits();
         registerDeposit(0, SafeCast.toUint128(msg.value), _zkSyncAddress);
     }
 
@@ -235,6 +253,7 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     ) external nonReentrant {
         require(_zkSyncAddress != SPECIAL_ACCOUNT_ADDRESS, "P");
         requireActive();
+        requireActiveDeposits();
 
         // Get token id by its address
         uint16 tokenId = governance.validateTokenAddress(address(_token));
@@ -590,63 +609,6 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         delegateAdditional();
     }
 
-    /// @notice Checks if Exodus mode must be entered. If true - enters exodus mode and emits ExodusMode event.
-    /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
-    /// @dev of existed priority requests expiration block number.
-    /// @return bool flag that is true if the Exodus mode must be entered.
-    function activateExodusMode() external nonReentrant returns (bool) {
-        if (exodusMode) {
-            return false;
-        }
-
-        // #if EASY_EXODUS
-        bool trigger = true;
-        // #else
-        bool trigger = block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
-            priorityRequests[firstPriorityRequestId].expirationBlock != 0;
-        // #endif
-
-        if (trigger) {
-            exodusMode = true;
-            emit ExodusMode();
-        }
-        return trigger;
-    }
-
-    /// @notice Withdraws token from ZkSync to root chain in case of exodus mode. User must provide proof that he owns funds
-    /// @param _storedBlockInfo Last verified block
-    /// @param _owner Owner of the account
-    /// @param _accountId Id of the account in the tree
-    /// @param _proof Proof
-    /// @param _tokenId Verified token id
-    /// @param _amount Amount for owner (must be total amount, not part of it)
-    function performExodus(
-        StoredBlockInfo calldata _storedBlockInfo,
-        address _owner,
-        uint32 _accountId,
-        uint32 _tokenId,
-        uint128 _amount,
-        uint32 _nftCreatorAccountId,
-        address _nftCreatorAddress,
-        uint32 _nftSerialId,
-        bytes32 _nftContentHash,
-        uint256[] calldata _proof
-    ) external {
-        // All functions delegated to additional should NOT be nonReentrant
-        // Silencing the warning "Unused function parameter"
-        _storedBlockInfo;
-        _owner;
-        _accountId;
-        _tokenId;
-        _amount;
-        _nftCreatorAccountId;
-        _nftCreatorAddress;
-        _nftSerialId;
-        _nftContentHash;
-        _proof;
-        delegateAdditional();
-    }
-
     /// @notice Set data for changing pubkey hash using onchain authorization.
     ///         Transaction author (msg.sender) should be L2 account address
     /// @notice New pubkey hash can be reset, to do that user should send two transactions:
@@ -660,6 +622,14 @@ contract ZkSync is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
         _nonce;
         _pubkeyHash;
         delegateAdditional();
+    }
+
+    /// @notice Pauses deposits. Can only be called by the governor and if deposits are not already paused.
+    function pauseDeposits() external {
+        governance.requireGovernor(msg.sender);
+        require(!pausedDeposits, "d"); // deposits are already paused
+        pausedDeposits = true;
+        emit DepositsPause();
     }
 
     /// @notice Register deposit request - pack pubdata, add priority request and emit OnchainDeposit event

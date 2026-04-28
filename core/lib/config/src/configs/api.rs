@@ -122,6 +122,11 @@ pub struct CommonApiConfig {
 
     /// The name of current subsidy. It is needed to conveniently fetch historical data regarding subsidies for different partners
     pub subsidy_name: String,
+
+    /// If set, all L2 transaction submissions (single and batch) are rejected with an error.
+    /// Intended for sunset / maintenance mode.
+    #[serde(default)]
+    pub l2_transactions_disabled: bool,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -263,6 +268,7 @@ mod tests {
                 subsidized_ips: vec!["127.0.0.1".to_owned()],
                 max_subsidy_usd_scaled: 20000,
                 subsidy_name: String::from("PartnerName"),
+                l2_transactions_disabled: false,
             },
             admin: AdminApiConfig {
                 port: 8080,

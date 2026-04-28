@@ -29,6 +29,10 @@ enforce_pubkey_change_fee=true
 max_number_of_transactions_per_batch=200
 max_number_of_authors_per_batch=10
 
+# When true, the API rejects all L2 transaction submissions (single and batch).
+# Intended for sunset / maintenance mode.
+l2_transactions_disabled=false
+
 [api.token]
 invalidate_token_cache_period_sec=300
 

@@ -22,7 +22,7 @@ use zksync_types::{
 };
 
 use web3::types::TransactionReceipt;
-use zksync_crypto::proof::{EncodedAggregatedProof, EncodedSingleProof};
+use zksync_crypto::proof::EncodedAggregatedProof;
 use zksync_crypto::rand::Rng;
 
 use crate::account_set::AccountSet;
@@ -413,29 +413,6 @@ impl TestSetup {
 
         // Receive the pending block processing request from state keeper.
         self.await_for_pending_block_request().await;
-    }
-
-    pub async fn exit(
-        &mut self,
-        sending_account: ETHAccountId,
-        account_id: AccountId,
-        token_id: Token,
-        amount: &BigUint,
-        zero_account_address: Address,
-        proof: EncodedSingleProof,
-    ) -> ETHExecResult {
-        let last_block = &self.last_committed_block;
-        self.accounts.eth_accounts[sending_account.0]
-            .exit(
-                last_block,
-                account_id,
-                token_id.0,
-                amount,
-                zero_account_address,
-                proof,
-            )
-            .await
-            .expect("Exit failed")
     }
 
     pub async fn full_exit(
@@ -1285,25 +1262,6 @@ impl TestSetup {
         self.tokens.keys().map(|id| Token(*id)).collect()
     }
 
-    pub async fn trigger_exodus_if_needed(&self, eth_account: ETHAccountId) {
-        self.accounts.eth_accounts[eth_account.0]
-            .trigger_exodus_if_needed()
-            .await
-            .expect("Trigger exodus if needed call");
-    }
-
-    pub async fn cancel_outstanding_deposits(
-        &self,
-        eth_account: ETHAccountId,
-        number: u64,
-        data: Vec<Vec<u8>>,
-    ) {
-        self.accounts.eth_accounts[eth_account.0]
-            .cancel_outstanding_deposits_for_exodus_mode(number, data)
-            .await
-            .expect("Failed to cancel outstanding deposits");
-    }
-
     pub async fn get_accounts_state(&self) -> AccountMap {
         let mut account_map = AccountMap::default();
         for id in 0..self.accounts.zksync_accounts.len() {
@@ -1326,25 +1284,5 @@ impl TestSetup {
         }
 
         account_map
-    }
-
-    pub fn gen_exit_proof_fungible(
-        &self,
-        accounts: AccountMap,
-        fund_owner: ZKSyncAccountId,
-        token: Token,
-    ) -> (EncodedSingleProof, BigUint) {
-        let owner = &self.accounts.zksync_accounts[fund_owner.0];
-        let owner_id = owner
-            .get_account_id()
-            .expect("Account should have id to exit");
-        // restore account state
-        zksync_prover_utils::exit_proof::create_exit_proof_fungible(
-            accounts,
-            owner_id,
-            owner.address,
-            token.0,
-        )
-        .expect("Failed to generate exit proof")
     }
 }

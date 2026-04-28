@@ -70,7 +70,8 @@ describe('zkSync process tokens which have no return value in `transfer` and `tr
                 amount
             );
             const receipt = await tx.wait();
-            gasFee = receipt.gasUsed.mul(await ethWallet.provider.getGasPrice());
+            const gasPrice = receipt.effectiveGasPrice || tx.gasPrice || (await ethWallet.provider.getGasPrice());
+            gasFee = receipt.gasUsed.mul(gasPrice);
         } else {
             await zksyncContract.withdrawPendingBalance(ethWallet.address, token, amount);
         }
@@ -222,7 +223,8 @@ describe('zkSync process tokens which take fee from sender', function () {
                 amount
             );
             const receipt = await tx.wait();
-            gasFee = receipt.gasUsed.mul(await ethWallet.provider.getGasPrice());
+            const gasPrice = receipt.effectiveGasPrice || tx.gasPrice || (await ethWallet.provider.getGasPrice());
+            gasFee = receipt.gasUsed.mul(gasPrice);
         } else {
             await zksyncContract.withdrawPendingBalance(ethWallet.address, token, amount);
         }

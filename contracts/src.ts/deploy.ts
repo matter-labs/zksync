@@ -190,8 +190,8 @@ export class Deployer {
             console.log('Deploying verifier target');
         }
         const { tx, address } = await this.deployViaCreate2(this.contracts.verifier.bytecode, {
-            gasLimit: 8000000,
-            ...ethTxOptions
+            ...ethTxOptions,
+            gasLimit: 8000000
         });
 
         const verRec = await tx.wait();
@@ -216,8 +216,8 @@ export class Deployer {
             console.log('Deploying zkSync target');
         }
         const { tx, address } = await this.deployViaCreate2(this.contracts.zkSync.bytecode, {
-            gasLimit: 6000000,
-            ...ethTxOptions
+            ...ethTxOptions,
+            gasLimit: 8000000
         });
 
         const zksRec = await tx.wait();
@@ -257,7 +257,7 @@ export class Deployer {
                 this.governorAddress,
                 process.env.CHAIN_STATE_KEEPER_FEE_ACCOUNT_ADDR
             ],
-            { gasLimit: 6000000, ...ethTxOptions }
+            { ...ethTxOptions, gasLimit: 8000000 }
         );
         const deployFactoryTx = await deployFactoryContract.deployTransaction.wait();
         const deployFactoryInterface = new Interface(this.deployFactoryCode.abi);
@@ -378,8 +378,8 @@ export class Deployer {
             this.contracts.forcedExit,
             [this.deployWallet.address, receiver],
             {
-                gasLimit: 8000000,
-                ...ethTxOptions
+                ...ethTxOptions,
+                gasLimit: 8000000
             }
         );
         const zksRec = await forcedExitContract.deployTransaction.wait();
@@ -404,8 +404,8 @@ export class Deployer {
             console.log('Deploying Additional Zksync contract');
         }
         const { tx, address } = await this.deployViaCreate2(this.contracts.additionalZkSync.bytecode, {
-            gasLimit: 6000000,
-            ...ethTxOptions
+            ...ethTxOptions,
+            gasLimit: 8000000
         });
 
         const zksRec = await tx.wait();

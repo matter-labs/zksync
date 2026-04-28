@@ -1,8 +1,8 @@
 use std::{collections::HashMap, fs, str::FromStr};
 
 use anyhow::Context;
-use bigdecimal::BigDecimal;
-use num_bigint::ToBigInt;
+use num_bigint::BigUint;
+use rayon::prelude::*;
 use web3::types::Address;
 use zksync_crypto::{
     Fr, merkle_tree::parallel_smt::SparseMerkleTreeSerializableCacheBN256,
@@ -39,18 +39,17 @@ fn restore_account(
     stored_balances: &[StorageBalance],
 ) -> (AccountId, Account) {
     let mut account = Account::default();
+    // Batch restore hashes each account exactly once, so we do not need the per-account
+    // circuit subtree cache. Dropping it before `set_balance` skips building the per-account
+    // balance SMT entirely (and avoids a multi-GB cache blow-up on large states).
+    account.drop_circuit_cache();
     account.nonce = Nonce(stored_account.nonce);
     account.address = Address::from_str(&stored_account.address).expect("Correct address");
     account.pub_key_hash = PubKeyHash::from_hex(&stored_account.pubkey_hash)
         .expect("db stored pubkey hash deserialize");
     for b in stored_balances.iter() {
         assert_eq!(b.account_id, stored_account.id);
-        let balance = BigDecimal::from_str(&b.balance)
-            .unwrap()
-            .to_bigint()
-            .unwrap()
-            .to_biguint()
-            .unwrap();
+        let balance = BigUint::from_str(&b.balance).expect("Correct balance");
         account.set_balance(TokenId(b.coin_id), balance);
     }
     (AccountId(stored_account.id), account)
@@ -61,13 +60,20 @@ pub(crate) fn restore_account_map(
     stored_accounts: HashMap<u32, StorageAccount>,
     stored_balances: HashMap<u32, Vec<StorageBalance>>,
 ) -> anyhow::Result<AccountMap> {
+    let accounts: Vec<(AccountId, Account)> = stored_accounts
+        .into_par_iter()
+        .map(|(account_id, stored_account)| {
+            let balances = stored_balances.get(&stored_account.id).with_context(|| {
+                "Account has no balances. Please check the consistency of the provided files"
+            })?;
+            assert_eq!(account_id, stored_account.id);
+            Ok::<_, anyhow::Error>(restore_account(&stored_account, balances))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
     let mut account_map = AccountMap::default();
-    for (account_id, stored_account) in stored_accounts {
-        let balances = stored_balances.get(&stored_account.id).context(
-            "Account has no balances. Please check the consistency of the provided files",
-        )?;
-        assert_eq!(account_id, stored_account.id);
-        let (account_id, account) = restore_account(&stored_account, balances);
+    account_map.reserve(accounts.len());
+    for (account_id, account) in accounts {
         account_map.insert(account_id, account);
     }
     Ok(account_map)
@@ -99,6 +105,8 @@ pub fn restore_tree(account_map: AccountMap) -> AccountTree {
 /// # Note
 /// It has a side effect of saving internals to a file.
 fn calculate_root_hash(tree: &AccountTree) -> Fr {
+    println!("Precomputing leaf hashes in parallel ...");
+    tree.precompute_leaf_hashes();
     println!("Calculating root hash ...");
     let root_hash = tree.root_hash();
     let internals = tree.get_internals();

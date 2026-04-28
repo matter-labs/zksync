@@ -178,6 +178,7 @@ impl StateKeeperTester {
 
     /// Ensures that there are no messages in the channel so far.
     pub async fn assert_empty(&mut self) {
+        #[allow(deprecated)]
         let next_block = self.response_rx.try_next();
         assert!(
             next_block.is_err(),

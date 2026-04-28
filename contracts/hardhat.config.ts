@@ -15,7 +15,11 @@ const prodConfig = {
 
     SECURITY_COUNCIL_MEMBERS_NUMBER: process.env.MISC_SECURITY_COUNCIL_MEMBERS_NUMBER,
     SECURITY_COUNCIL_MEMBERS: process.env.MISC_SECURITY_COUNCIL_MEMBERS,
-    SECURITY_COUNCIL_THRESHOLD: process.env.MISC_SECURITY_COUNCIL_THRESHOLD
+    SECURITY_COUNCIL_THRESHOLD: process.env.MISC_SECURITY_COUNCIL_THRESHOLD,
+    // Hardcoded so the Security Council can audit the deployed bytecode against
+    // the same address that will gate setClaimRoot post-upgrade. Deliberately
+    // NOT sourced from env so a misconfigured deployer cannot swap it silently.
+    SECURITY_COUNCIL_MULTISIG_ADDRESS: '0x32f51A90f2AB658439B88CE75E891fa3ba78B21f'
 };
 
 const testnetConfig = {
@@ -29,7 +33,9 @@ const testnetConfig = {
 
     SECURITY_COUNCIL_MEMBERS_NUMBER: process.env.MISC_SECURITY_COUNCIL_MEMBERS_NUMBER,
     SECURITY_COUNCIL_MEMBERS: process.env.MISC_SECURITY_COUNCIL_MEMBERS,
-    SECURITY_COUNCIL_THRESHOLD: process.env.MISC_SECURITY_COUNCIL_THRESHOLD
+    SECURITY_COUNCIL_THRESHOLD: process.env.MISC_SECURITY_COUNCIL_THRESHOLD,
+    // sepolia testnet: same EOA is networkGovernor + gatekeeper master + SC member #2
+    SECURITY_COUNCIL_MULTISIG_ADDRESS: '0x0fE9Cf0B322Ab3102366b534C4A0Ec8230F1C422'
 };
 
 const testConfig = {
@@ -45,7 +51,10 @@ const testConfig = {
     // First 3 accounts obtained from `$ZKSYNC_HOME/etc/test_config/constant/test_mnemonic.json` mnemonic
     SECURITY_COUNCIL_MEMBERS:
         '0x36615Cf349d7F6344891B1e7CA7C72883F5dc049,0xa61464658AfeAf65CccaaFD3a512b69A83B77618,0x0D43eB5B8a47bA8900d84AA36656c92024e9772e',
-    SECURITY_COUNCIL_THRESHOLD: '2'
+    SECURITY_COUNCIL_THRESHOLD: '2',
+    // Placeholder for tests; the dev-contract ZkSyncWithdrawalUnitTest exposes
+    // setSecurityCouncilMultisig so tests can point it at the live signer.
+    SECURITY_COUNCIL_MULTISIG_ADDRESS: '0x0000000000000000000000000000000000000001'
 };
 
 const localConfig = Object.assign({}, prodConfig);
@@ -58,6 +67,7 @@ localConfig.NEW_ADDITIONAL_ZKSYNC_ADDRESS = process.env.CONTRACTS_ADDITIONAL_ZKS
 localConfig.SECURITY_COUNCIL_MEMBERS_NUMBER = process.env.MISC_SECURITY_COUNCIL_MEMBERS_NUMBER;
 localConfig.SECURITY_COUNCIL_MEMBERS = process.env.MISC_SECURITY_COUNCIL_MEMBERS;
 localConfig.SECURITY_COUNCIL_THRESHOLD = process.env.MISC_SECURITY_COUNCIL_THRESHOLD;
+// localConfig inherits SECURITY_COUNCIL_MULTISIG_ADDRESS from prodConfig (mainnet value).
 
 // @ts-ignore
 localConfig.EASY_EXODUS = process.env.CONTRACTS_TEST_EASY_EXODUS === 'true';

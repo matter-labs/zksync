@@ -177,8 +177,24 @@ contract Storage {
     mapping(uint256 => bool) internal securityCouncilApproves;
     uint256 internal numberOfApprovalsFromSecurityCouncil;
 
+    /// @dev Flag indicates that deposits are paused.
+    /// @dev Once it was raised, it can not be cleared again, and all users must exit
+    bool public pausedDeposits;
+
+    /// @notice Checks that current state not is exodus mode
+    function requireActiveDeposits() internal view {
+        require(!pausedDeposits, "LD"); // pausedDeposits activated
+    }
+
+    address internal l1ClaimDistributor;
+    mapping(address => bool) internal migratedTokensByAddress;
+    bytes32 internal claimRoot;
+
     /// @notice Checks that current state not is exodus mode
     function requireActive() internal view {
         require(!exodusMode, "L"); // exodus mode activated
     }
+
+    /// @dev Safe multisig controlled by 9 of 15 ZKsync Lite Security Council members.
+    address internal securityCouncilMultisig;
 }

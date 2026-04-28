@@ -7,10 +7,11 @@ use crate::{
 };
 
 use fnv::FnvHashMap;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
-    sync::{RwLock, RwLockReadGuard},
+    sync::{Arc, RwLock, RwLockReadGuard},
 };
 
 /// Nodes are indexed starting with index(root) = 0
@@ -77,7 +78,9 @@ where
     // List of the intermediate nodes.
     nodes: Vec<Node>,
     /// Cache of the hashes for the "default" nodes (e.g. ones that are absent in the tree).
-    prehashed: Vec<Hash>,
+    /// Shared via `Arc` so that cloning an empty subtree (e.g. cloning the per-account
+    /// `BALANCE_TREE` template) doesn't re-allocate the ~1 KB prehashed vector.
+    prehashed: Arc<Vec<Hash>>,
     /// Cache storing the already calculated hashes for nodes
     /// allowing us to avoid calculating the hash of the element more than once.
     /// `RwLock` is required to fulfill the following criteria:
@@ -201,7 +204,7 @@ where
 
         Self {
             tree_depth,
-            prehashed,
+            prehashed: Arc::new(prehashed),
             items,
             hasher,
             nodes,
@@ -436,14 +439,113 @@ where
     pub fn root_hash(&self) -> Hash {
         let (root_hash, intermediate_hashes) = self.get_hash(Self::ROOT_ITEM_IDX);
 
-        // Store all the intermediate hashes in the cache.
+        // Store all the intermediate hashes in the cache under a single write-lock acquire.
+        let mut cache = self.cache.write().expect("write lock");
+        cache.reserve(intermediate_hashes.len());
         for (item_idx, hash) in intermediate_hashes {
-            self.cache
-                .write()
-                .expect("write lock")
-                .insert(item_idx, hash);
+            cache.insert(item_idx, hash);
         }
+        drop(cache);
         root_hash
+    }
+
+    /// Like `root_hash`, but:
+    /// - never writes into the cache, and
+    /// - walks the tree sequentially (no `rayon::join` per level).
+    ///
+    /// Meant for "compute the root once and throw away the tree" use cases
+    /// — in particular each per-account balance subtree during a bulk rebuild.
+    /// Avoids the Vec-of-intermediate-hashes allocation, the cache write lock
+    /// round-trips, and the nested rayon scheduling that otherwise occur per leaf.
+    pub fn root_hash_sequential_nocache(&self) -> Hash {
+        self.get_hash_sequential_nocache(Self::ROOT_ITEM_IDX)
+    }
+
+    fn get_hash_sequential_nocache(&self, node_ref: NodeRef) -> Hash {
+        let node = &self.nodes[node_ref];
+        if node.depth == self.tree_depth {
+            let item_index: ItemIndex = (node.index.0 - (1 << self.tree_depth)) as ItemIndex;
+            let item_bits = self.items[&item_index].get_bits_le();
+            return self.hasher.hash_bits(item_bits);
+        }
+
+        let lhs_hash = match node.left {
+            Some(child_ref) => self.calculate_child_hash_sequential_nocache(child_ref, node),
+            None => self.prehashed[node.depth + 1].clone(),
+        };
+        let rhs_hash = match node.right {
+            Some(child_ref) => self.calculate_child_hash_sequential_nocache(child_ref, node),
+            None => self.prehashed[node.depth + 1].clone(),
+        };
+        self.calculate_hash(node.depth, &lhs_hash, &rhs_hash)
+    }
+
+    fn calculate_child_hash_sequential_nocache(
+        &self,
+        child_ref: NodeRef,
+        parent: &Node,
+    ) -> Hash {
+        let child = &self.nodes[child_ref];
+        let mut cur_hash = self.get_hash_sequential_nocache(child_ref);
+
+        let mut cur_depth = child.depth - 1;
+        let mut cur_idx = child.index;
+        while cur_depth > parent.depth {
+            let direction = NodeDirection::from_idx(cur_idx);
+            let supplement_hash = self.prehashed[cur_depth + 1].clone();
+            let (lhs_hash, rhs_hash) = direction.order_elements(cur_hash, supplement_hash);
+            cur_hash = self.calculate_hash(cur_depth, &lhs_hash, &rhs_hash);
+            cur_depth -= 1;
+            cur_idx.0 >>= 1;
+        }
+        cur_hash
+    }
+
+    /// Hashes every present leaf in parallel and seeds the cache with the result,
+    /// keyed by each leaf's `NodeIndex`.
+    ///
+    /// This is meant for one-shot, bulk tree builds (e.g. state restore): hashing a
+    /// leaf in the account tree rebuilds a per-account balance SMT, so running
+    /// them as a flat `par_iter` yields cleaner parallelism than the nested
+    /// `rayon::join` recursion that `root_hash` would otherwise do.
+    ///
+    /// Prints progress to stderr every ~5% so long bulk runs are not silent.
+    pub fn precompute_leaf_hashes(&self) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::time::Instant;
+
+        let tree_depth = self.tree_depth;
+        let leaf_base = 1u64 << tree_depth;
+        let total = self.items.len();
+        let step = (total / 100).max(1);
+        let counter = AtomicUsize::new(0);
+        let start = Instant::now();
+        eprintln!("Precomputing leaf hashes for {} items (step: {}) ...", total, step);
+
+        let leaves: Vec<(NodeIndex, Hash)> = self
+            .items
+            .par_iter()
+            .map(|(&item_index, item)| {
+                let node_index = NodeIndex(leaf_base + item_index);
+                let hash = self.hasher.hash_bits(item.get_bits_le());
+                let n = counter.fetch_add(1, Ordering::Relaxed) + 1;
+                if n % step == 0 || n == total {
+                    let elapsed = start.elapsed().as_secs();
+                    let pct = n * 100 / total;
+                    eprintln!(
+                        "  leaf hashes: {}/{} ({}%) [{}s elapsed]",
+                        n, total, pct, elapsed
+                    );
+                }
+                (node_index, hash)
+            })
+            .collect();
+
+        let mut cache = self.cache.write().expect("write lock");
+        cache.reserve(leaves.len());
+        for (idx, hash) in leaves {
+            cache.insert(idx, hash);
+        }
     }
 
     /// Returns the capacity of the tree (how many items can the tree hold).
@@ -663,16 +765,23 @@ where
         // The updates list won't contain the current node, we will add it below.
         let (hash, mut updates) = {
             if node.depth == self.tree_depth {
-                // leaf node: return item hash
-                let item_index: ItemIndex = (node.index.0 - (1 << self.tree_depth)) as ItemIndex;
+                // Leaf node: consult the cache first. Leaf hashes can be seeded in bulk
+                // via `precompute_leaf_hashes` to skip the `get_bits_le` cost here
+                // (which for the account tree rebuilds a fresh balance subtree per call).
+                if let Some(cached) = self.cache.read().expect("Read lock").get(&node.index) {
+                    (cached.clone(), vec![])
+                } else {
+                    let item_index: ItemIndex =
+                        (node.index.0 - (1 << self.tree_depth)) as ItemIndex;
 
-                let item_bits = self.items[&item_index].get_bits_le();
-                let item_hash = self.hasher.hash_bits(item_bits);
+                    let item_bits = self.items[&item_index].get_bits_le();
+                    let item_hash = self.hasher.hash_bits(item_bits);
 
-                // There are no underlying updates for leaf node.
-                let updates = vec![];
+                    // There are no underlying updates for leaf node.
+                    let updates = vec![];
 
-                (item_hash, updates)
+                    (item_hash, updates)
+                }
             } else {
                 // Not a leaf node: recursively calculate the hashes up to this node.
 

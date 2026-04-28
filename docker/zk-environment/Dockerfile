@@ -38,8 +38,8 @@ RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/so
     gcloud config set metrics/environment github_docker_image
 
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
-RUN cargo install diesel_cli --no-default-features --features postgres
-RUN cargo install --version=0.5.6 sqlx-cli
+RUN cargo install --locked diesel_cli --no-default-features --features postgres
+RUN cargo install --locked --version=0.8.6 sqlx-cli --no-default-features --features postgres
 
 # Install `solc`
 RUN curl -LO https://github.com/ethereum/solidity/releases/download/v0.5.16/solc-static-linux

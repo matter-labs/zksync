@@ -1,6 +1,7 @@
 use crate::params;
 
 use crate::{
+    convert::FeConvert,
     ff,
     franklin_crypto::{
         alt_babyjubjub::JubjubEngine,
@@ -10,6 +11,7 @@ use crate::{
     merkle_tree::hasher::Hasher,
     Fr,
 };
+use num::BigUint;
 use zksync_basic_types::Address;
 
 fn pub_key_hash_self<E: JubjubEngine, H: Hasher<E::Fr>>(
@@ -115,4 +117,21 @@ pub fn append_be_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, widt
 
 pub fn eth_address_to_fr(address: &Address) -> Fr {
     ff::from_hex(&format!("{:x}", address)).unwrap()
+}
+
+/// Converts a `u32` to an `Fr` element without going through a decimal string.
+pub fn u32_to_fr(value: u32) -> Fr {
+    let mut bytes = [0u8; 32];
+    bytes[28..].copy_from_slice(&value.to_be_bytes());
+    Fr::from_bytes(&bytes).expect("u32 always fits in Fr")
+}
+
+/// Converts a `BigUint` (assumed to fit in 32 bytes / the field modulus)
+/// to an `Fr` element without going through a decimal string.
+pub fn biguint_to_fr(value: &BigUint) -> Fr {
+    let bytes = value.to_bytes_be();
+    debug_assert!(bytes.len() <= 32, "BigUint does not fit in Fr");
+    let mut padded = [0u8; 32];
+    padded[32 - bytes.len()..].copy_from_slice(&bytes);
+    Fr::from_bytes(&padded).expect("BigUint exceeds Fr modulus")
 }

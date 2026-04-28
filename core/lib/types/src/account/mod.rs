@@ -10,14 +10,13 @@ use serde::{Deserialize, Serialize};
 use zksync_crypto::{
     circuit::{
         account::{Balance, CircuitAccount},
-        utils::eth_address_to_fr,
+        utils::{biguint_to_fr, eth_address_to_fr, u32_to_fr},
     },
-    franklin_crypto::bellman::pairing::ff::PrimeField,
     primitives::GetBits,
 };
 use zksync_utils::BigUintSerdeWrapper;
 // Local uses
-use super::{AccountId, AccountUpdates, Address, Fr, Nonce, TokenId, NFT};
+use super::{AccountId, AccountUpdates, Address, Nonce, TokenId, NFT};
 
 pub use self::{account_update::AccountUpdate, pubkey_hash::PubKeyHash};
 
@@ -119,7 +118,7 @@ impl From<Account> for CircuitAccount<super::Engine> {
             let mut raw_account = circuit_account.read().unwrap().clone();
 
             // Given that the following fields are public, they may change externally, so we make sure to set them manually.
-            raw_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
+            raw_account.nonce = u32_to_fr(*acc.nonce);
             raw_account.pub_key_hash = acc.pub_key_hash.as_fr();
             raw_account.address = eth_address_to_fr(&acc.address);
 
@@ -132,14 +131,14 @@ impl From<Account> for CircuitAccount<super::Engine> {
             (
                 *id,
                 Balance {
-                    value: Fr::from_str(&b.0.to_string()).unwrap(),
+                    value: biguint_to_fr(&b.0),
                 },
             )
         }) {
             circuit_account.subtree.insert(*i, b);
         }
 
-        circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
+        circuit_account.nonce = u32_to_fr(*acc.nonce);
         circuit_account.pub_key_hash = acc.pub_key_hash.as_fr();
         circuit_account.address = eth_address_to_fr(&acc.address);
         circuit_account
@@ -166,7 +165,7 @@ impl GetBits for Account {
             // Make sure to manually set all the public fields to ensure that circuit account represents
             // the actual state of account (in case these were changed extermally).
             // Balances are private, so we may be sure that the subtree in the account is update
-            circuit_account.nonce = Fr::from_str(&self.nonce.to_string()).unwrap();
+            circuit_account.nonce = u32_to_fr(*self.nonce);
             circuit_account.pub_key_hash = self.pub_key_hash.as_fr();
             circuit_account.address = eth_address_to_fr(&self.address);
 
@@ -178,6 +177,15 @@ impl GetBits for Account {
 }
 
 impl Account {
+    /// Drops the cached `CircuitAccount` (and its balance subtree) to free memory.
+    ///
+    /// After this is called, `get_bits_le` falls back to building a fresh `CircuitAccount`
+    /// from the balances on every call. Use when holding per-account subtree caches for
+    /// millions of accounts would blow up memory (e.g. during one-shot state restore).
+    pub fn drop_circuit_cache(&mut self) {
+        self.circuit_account = None;
+    }
+
     /// Checks whether this object is an empty default account (equivalent to non-existing account).
     pub fn is_default(&self) -> bool {
         // Checks are sorted so that cheap ones go first.
@@ -227,7 +235,7 @@ impl Account {
         if let Some(circuit_account) = &mut self.circuit_account {
             let mut circuit_account = circuit_account.write().unwrap();
             let balance = Balance {
-                value: Fr::from_str(&amount.0.to_string()).unwrap(),
+                value: biguint_to_fr(&amount.0),
             };
             circuit_account.subtree.insert(*token, balance);
         }
