@@ -11,5 +11,5 @@ Full reference on how to use the library can be found [here](https://zksync.io/a
 
 ## Changelog
 
-The changelog of the zksync.js is avaliable
+The changelog of the zksync.js is available
 [here](https://github.com/matter-labs/zksync/blob/master/changelog/js-sdk.md).
