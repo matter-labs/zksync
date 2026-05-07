@@ -5,7 +5,7 @@
 [![Live on Mainnet](https://img.shields.io/badge/wallet-Live%20on%20Mainnet-blue)](https://wallet.zksync.io)
 [![Live on Rinkeby](https://img.shields.io/badge/wallet-Live%20on%20Rinkeby-blue)](https://rinkeby.zksync.io)
 [![Live on Ropsten](https://img.shields.io/badge/wallet-Live%20on%20Ropsten-blue)](https://ropsten.zksync.io)
-
+dfg
 zkSync is a scaling and privacy engine for Ethereum. Its current functionality scope includes low gas transfers of ETH
 and ERC20 tokens in the Ethereum network.
 
