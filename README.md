@@ -27,7 +27,7 @@ This architecture provides the following guarantees:
 
 In other words, ZK Rollup strictly inherits the security guarantees of the underlying L1.
 
-To learn how to use zkSync, please refer to the [zkSync SDK documentation](https://zksync.io/api/sdk/).
+To learn how to use zkSync, please refer to the [zkSync SDK documentation](https://docs.zksync.io/).
 
 ## Development Documentation
 
