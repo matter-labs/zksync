@@ -72,7 +72,7 @@ describe(`CREATE2 tests`, () => {
     });
 
     step('should fail eth-signed batch from create2 account', async () => {
-        // here we have a signle eth signature for the whole batch
+        // here we have a single eth signature for the whole batch
         await tester.testCreate2SignedBatchFail(hilda, david, token, TX_AMOUNT);
 
         // Switch provider to RPC, because REST provider always expects

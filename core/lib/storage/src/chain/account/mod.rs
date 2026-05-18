@@ -29,7 +29,7 @@ use num::bigint::ToBigInt;
 pub struct AccountSchema<'a, 'c>(pub &'a mut StorageProcessor<'c>);
 
 impl<'a, 'c> AccountSchema<'a, 'c> {
-    /// Stores account type in the databse
+    /// Stores account type in the database
     pub async fn set_account_type(
         &mut self,
         account_id: AccountId,

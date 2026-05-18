@@ -169,7 +169,7 @@ async fn delete_old_requests(mut storage: StorageProcessor<'_>) -> QueryResult<(
     )
     .unwrap();
 
-    // Setting fullfilled_by for the oldest request
+    // Setting fulfilled_by for the oldest request
     // so that it should not be deleted
     ForcedExitRequestsSchema(&mut storage)
         .set_fulfilled_by(stored_requests[0].id, Some(vec![transaction_hash]))

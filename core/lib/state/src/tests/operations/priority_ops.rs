@@ -90,7 +90,7 @@ fn full_exit_non_existent() {
     tb.test_priority_op_success(ZkSyncPriorityOp::FullExit(full_exit), &[])
 }
 
-/// Check successfull FullExit
+/// Check successful FullExit
 #[test]
 fn full_exit_success() {
     let token = TokenId(0);
