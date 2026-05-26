@@ -15,32 +15,56 @@ function loadBlocksFile() {
     );
 }
 
-async function main() {
+async function fetchBlocks() {
     const response = await fetch(
         `${process.env.ZKSYNC_REST_ADDR}/api/v0.2/blocks?from=latest&limit=100&direction=older`
     );
     const data = await response.json();
-    const blocks = data['result']['list'];
-    let results: { [key: string]: string } = {};
-    for (const block of blocks) {
-        results[block['blockNumber'].toString()] = block['newStateRoot'];
+    return data.result.list;
+}
+
+function saveBlocksToFile(blocks) {
+    fs.writeFileSync('blocks.json', JSON.stringify(blocks));
+}
+
+function loadBlocksFromFile() {
+    try {
+        const fileContent = fs.readFileSync('blocks.json', 'utf-8');
+        return JSON.parse(fileContent);
+    } catch (error) {
+        throw new Error('Unable to load blocks from file');
     }
+}
+
+async function main() {
+    const blocks = await fetchBlocks();
+    const results = blocks.reduce((acc, block) => {
+        acc[block.blockNumber.toString()] = block.newStateRoot;
+        return acc;
+    }, {});
+
     let jsonBlocks;
     try {
-        jsonBlocks = loadBlocksFile();
+        jsonBlocks = loadBlocksFromFile();
     } catch (e) {
-        fs.writeFileSync('blocks.json', JSON.stringify(results));
+        saveBlocksToFile(results);
+        console.log('Blocks file created.');
         return;
     }
+
     for (const jsonBlockNum in jsonBlocks) {
         const rootHash = jsonBlocks[jsonBlockNum];
         if (rootHash !== results[jsonBlockNum]) {
-            throw new Error(`Wrong block  ${jsonBlockNum}`);
+            throw new Error(`Wrong block ${jsonBlockNum}`);
         }
     }
     console.log('Everything is fine');
 }
 
 (async () => {
-    await main();
+    try {
+        await main();
+    } catch (error) {
+        console.error(error);
+    }
 })();
