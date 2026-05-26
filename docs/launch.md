@@ -40,7 +40,7 @@ simply launch:
 zk up
 ```
 
-## (Re)deploy db and contraсts
+## (Re)deploy db and contracts
 
 ```
 zk contract redeploy
