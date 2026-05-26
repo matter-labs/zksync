@@ -11,4 +11,4 @@ zkSync strictly inherits the security assumptions of L1 [here](https://zksync.io
 
 ## Changelog
 
-The changelog of the contracts is avaliable [here](/changelog/contracts.md).
+The changelog of the contracts is available [here](/changelog/contracts.md).
