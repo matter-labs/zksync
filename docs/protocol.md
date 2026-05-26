@@ -2267,7 +2267,7 @@ onchain operation and 0 otherwise.
 
 For Merkle trees and hash invocations that require collision resistance we use Rescue hash described in
 [AABDS19](https://eprint.iacr.org/2019/426.pdf). Reference implementation examples can be found in
-[SW19](https://starkware.co/hash-challenge-implementation-reference-code/#marvellous).
+[SW19](https://starkware.co/).
 
 For our application we've chosen the following parametrization:
 
