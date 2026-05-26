@@ -62,10 +62,10 @@ This section provides an overview on folders / sub-projects that exist in this r
     - `/zksync_witness_generator`: zkSync server Witness Generator & Prover Server microservice.
   - `/lib`: Dependencies of the binaries above.
     - `/basic_types`: Crate with declaration of the essential zkSync primitives, such as `address`.
-    - `/circuit`: Cryptographic environment enforsing the correctness of executed transactions in the zkSync network.
+    - `/circuit`: Cryptographic environment enforcing the correctness of executed transactions in the zkSync network.
     - `/config`: Utilities to load configuration options of zkSync applications.
     - `/contracts`: Loaders for zkSync contracts interfaces and ABI.
-    - `/crypto`: Cryptographical primitives using among zkSync crates.
+    - `/crypto`: Cryptographic primitives used among zkSync crates.
     - `/eth_client`: Module providing an interface to interact with an Ethereum node.
     - `/prometheus_exporter`: Prometheus data exporter.
     - `/prover_utils`: Utilities related to the proof generation.
@@ -73,7 +73,7 @@ This section provides an overview on folders / sub-projects that exist in this r
     - `/storage`: An encapsulated database interface.
     - `/types`: zkSync network operations, transactions and common types.
     - `/utils`: Miscellaneous helpers for zkSync crates.
-    - `/vlog`: An utility library for verbose logging.
+    - `/vlog`: A utility library for verbose logging.
   - `/tests`: Testing infrastructure for zkSync network.
     - `/loadnext`: An application for highload testing of zkSync server.
     - `/test_account`: A representation of zkSync account which can be used for tests.
@@ -81,11 +81,11 @@ This section provides an overview on folders / sub-projects that exist in this r
     - `/ts-tests`: Integration tests set implemented in TypeScript. Requires a running Server and Prover applications to
       operate.
 - `/docker`: Dockerfiles used for development of zkSync and for packaging zkSync for a production environment.
-- `/etc`: Configration files.
-  - `/env`: `.env` files that contain environment variables for different configuration of zkSync Server / Prover.
+- `/etc`: Configuration files.
+  - `/env`: `.env` files that contain environment variables for different configurations of the zkSync Server/Prover.
   - `/js`: Configuration files for JavaScript applications (such as Explorer).
   - `/tokens`: Configuration of supported Ethereum ERC-20 tokens.
-- `/infrastructure`: Application that aren't naturally a part of zkSync core, but are related to it.
+- `/infrastructure`: Applications that aren't naturally a part of the zkSync core but are related to it.
 - `/keys`: Verification keys for `circuit` module.
 - `/sdk`: Implementation of client libraries for zkSync network in different programming languages.
   - `/zksync-crypto`: zkSync network cryptographic primitives, which can be compiled to WASM.
