@@ -52,7 +52,7 @@ priority requests** are accrued to the owners' **root-chain balances** to make t
 
 It is a standard withdrawal operation. When a block with `partial_exit` **circuit operation** is committed, **withdraw
 onchain operation** for this withdrawal is created. If the block is verified, funds from the **withdrawal onchain
-operation** are acrued to the users' **root-chain balances**.
+operation** are accrued to the users' **root-chain balances**.
 
 If the block is reverted, this **withdraw onchain operations** are simply discarded.
 
