@@ -24,7 +24,7 @@ pub trait ForcedExitAccountAgeChecker {
 
 #[derive(Clone)]
 pub struct ForcedExitChecker {
-    /// Mimimum age of the account for `ForcedExit` operations to be allowed.
+    /// Minimum age of the account for `ForcedExit` operations to be allowed.
     pub forced_exit_minimum_account_age: chrono::Duration,
 }
 
