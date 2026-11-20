@@ -1,13 +1,13 @@
 # Loadnext: the next generation loadtest for zkSync
 
-Loadnext is an utility for random stress-testing the zkSync server. It is capable of simulating the behavior of many
+Loadnext is a utility for random stress-testing the zkSync server. It is capable of simulating the behavior of many
 independent users of zkSync network, who are sending quasi-random requests to the server.
 
 It:
 
 - doesn't care whether the server is alive or not. At worst, it will just consider the test failed. No panics, no
   mindless unwraps, yay.
-- does a unique set of operations for each participating account.
+- performs a unique set of operations for each participating account.
 - sends transactions, batches, and priority operations.
 - sends incorrect transactions as well as correct ones and compares the outcome to the expected one.
 - has an easy-to-extend command system that allows adding new types of actions to the flow.
@@ -40,7 +40,7 @@ Without any configuration supplied, the test will fallback to the dev defaults:
 
 **Note:** when running the loadtest in the localhost scenario, you **must** adjust the supported block chunks sizes.
 Edit the `etc/env/dev/chain.toml` and set `block_chunk_sizes` to `[10,32,72,156,322,654]` and `aggregated_proof_sizes`
-to `[1,4,8,18]`. Do not forget to re-compile configs after that.
+to `[1,4,8,18]`. Do not forget to recompile the configs after that.
 
 This is required because the loadtest relies on batches, which will not fit into smaller block sizes.
 
