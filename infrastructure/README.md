@@ -13,4 +13,4 @@ Each of the project has its own `README.md`, which describes it the best way pos
 
 ## Changelog
 
-The changelog of the infrastructure is avaliable [here](/changelog/infrastructure.md).
+The changelog of the infrastructure is available [here](/changelog/infrastructure.md).
