@@ -15,7 +15,7 @@ pub trait TokenWatcher {
 }
 
 /// Watcher for Uniswap protocol
-/// https://thegraph.com/explorer/subgraph/uniswap/uniswap-v2
+/// https://thegraph.com/hosted-service/subgraph/uniswap/uniswap-v2
 #[derive(Clone)]
 pub struct UniswapTokenWatcher {
     client: reqwest::Client,

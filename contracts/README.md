@@ -7,7 +7,7 @@ This document is a description of the zkSync smart contracts.
 
 ## Security
 
-zkSync strictly inherits the security assumptions of L1 [here](https://zksync.io/faq/security.html).
+zkSync strictly inherits the security assumptions of L1 [here](https://docs.lite.zksync.io/userdocs/security/).
 
 ## Changelog
 
